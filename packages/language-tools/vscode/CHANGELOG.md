@@ -1,10 +1,132 @@
 # astro-vscode
 
+## 2.16.16
+
+### Patch Changes
+
+- [#16719](https://github.com/withastro/astro/pull/16719) [`2b1df12`](https://github.com/withastro/astro/commit/2b1df120f14ae44ade0cfcc8c6bf17071061cd28) Thanks [@alexisintech](https://github.com/alexisintech)! - fix MDX syntax highlighting for indented astro codeblocks
+
+## 2.16.15
+
+### Patch Changes
+
+- [#16716](https://github.com/withastro/astro/pull/16716) [`04fdbb2`](https://github.com/withastro/astro/commit/04fdbb29978d5a00acfb956538e54256ae24b486) Thanks [@delucis](https://github.com/delucis)! - Drops support for versions of VS Code below 1.101.0 [May 2025]
+
+## 2.16.14
+
+### Patch Changes
+
+- [#16069](https://github.com/withastro/astro/pull/16069) [`c9a5807`](https://github.com/withastro/astro/commit/c9a58073a340959f081b66d2ff50c1f2445b6b05) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Updates the minimum supported version of VS Code to 1.92.0 (July 2024)
+
+## 2.16.13
+
+### Patch Changes
+
+- [#15943](https://github.com/withastro/astro/pull/15943) [`1a627e2`](https://github.com/withastro/astro/commit/1a627e25267f8525e11237a1422c228f1bfc2ef1) Thanks [@alexanderdombroski](https://github.com/alexanderdombroski)! - Improves astro file templates to be scoped to `.astro` file extensions
+
+- [#15927](https://github.com/withastro/astro/pull/15927) [`421e8de`](https://github.com/withastro/astro/commit/421e8de6e9e13ca45864c2d3deed7e98e3ee6138) Thanks [@FelmonFekadu](https://github.com/FelmonFekadu)! - Fixes completions sometimes not working inside the `href` attribute
+
+- [#15602](https://github.com/withastro/astro/pull/15602) [`7832dfe`](https://github.com/withastro/astro/commit/7832dfef25dffe55a9dcb1913d03375ecac9ad42) Thanks [@0xRozier](https://github.com/0xRozier)! - Fix syntax highlighting for script and style tags inside expressions (e.g. ternaries and logical operators)
+
+## 2.16.12
+
+### Patch Changes
+
+- [#15895](https://github.com/withastro/astro/pull/15895) [`7b4b254`](https://github.com/withastro/astro/commit/7b4b2549437eb099c5e96025dcf8d24ea56f30d0) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Updates Volar services to 0.0.70. This updates notably mean that the transitive dependency yaml-language-server no longer depends on a vulnerable version of lodash, causing warnings to show when installing the language server.
+
+## 2.16.11
+
+### Patch Changes
+
+- [#15825](https://github.com/withastro/astro/pull/15825) [`2cfe935`](https://github.com/withastro/astro/commit/2cfe935db452fce91553784157e31c26bb3b2a05) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Fixes failed publish for 2.16.11.
+
+## 2.16.10
+
+### Patch Changes
+
+- [#15823](https://github.com/withastro/astro/pull/15823) [`29e03fa`](https://github.com/withastro/astro/commit/29e03faa9a542556d0cf996ce770c5ea7815ce3b) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Fixes broken publishing
+
+## 2.16.9
+
+### Patch Changes
+
+- [#15125](https://github.com/withastro/astro/pull/15125) [`6feb0d7`](https://github.com/withastro/astro/commit/6feb0d7bec1e333eb795ae0fc51516182a73eb2b) Thanks [@florian-lefebvre](https://github.com/florian-lefebvre)! - Fix "Find All References" and other TypeScript features by ensuring the plugin bundle is correctly included
+
+- [#15125](https://github.com/withastro/astro/pull/15125) [`6feb0d7`](https://github.com/withastro/astro/commit/6feb0d7bec1e333eb795ae0fc51516182a73eb2b) Thanks [@florian-lefebvre](https://github.com/florian-lefebvre)! - Fixes syntax highlighting sometimes not working when the frontmatter or script tags ended with certain TypeScript constructs
+
+- [#15496](https://github.com/withastro/astro/pull/15496) [`eb7cdda`](https://github.com/withastro/astro/commit/eb7cdda6837a8b28e279f668d0fe2a06f02f6990) Thanks [@matthewp](https://github.com/matthewp)! - Fix syntax highlighting for lowercase component tags that start with "style" or "script".
+
+## 2.16.9-beta.0
+
+### Patch Changes
+
+- [#15496](https://github.com/withastro/astro/pull/15496) [`eb7cdda`](https://github.com/withastro/astro/commit/eb7cdda6837a8b28e279f668d0fe2a06f02f6990) Thanks [@matthewp](https://github.com/matthewp)! - Fix syntax highlighting for lowercase component tags that start with "style" or "script".
+
+## 2.16.9-beta.0
+
+### Patch Changes
+
+- [#15125](https://github.com/withastro/astro/pull/15125) [`6feb0d7`](https://github.com/withastro/astro/commit/6feb0d7bec1e333eb795ae0fc51516182a73eb2b) Thanks [@florian-lefebvre](https://github.com/florian-lefebvre)! - Fix "Find All References" and other TypeScript features by ensuring the plugin bundle is correctly included
+
+- [#15125](https://github.com/withastro/astro/pull/15125) [`6feb0d7`](https://github.com/withastro/astro/commit/6feb0d7bec1e333eb795ae0fc51516182a73eb2b) Thanks [@florian-lefebvre](https://github.com/florian-lefebvre)! - Fixes syntax highlighting sometimes not working when the frontmatter or script tags ended with certain TypeScript constructs
+
+## 2.16.8
+
+### Patch Changes
+
+- [#15156](https://github.com/withastro/astro/pull/15156) [`9cc2c71`](https://github.com/withastro/astro/commit/9cc2c71a601c04415f13b3ac62c361ef2c40b63d) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Fixes TypeScript plugin not working
+
+## 2.16.7
+
+### Patch Changes
+
+- [#15131](https://github.com/withastro/astro/pull/15131) [`d40ff7d`](https://github.com/withastro/astro/commit/d40ff7d8570f30c82402d8e2b01d4da890e3e771) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Fixes extension asking for the wrong version of VS Code
+
+## 2.16.6
+
+### Patch Changes
+
+- [#15083](https://github.com/withastro/astro/pull/15083) [`241bb31`](https://github.com/withastro/astro/commit/241bb31d4d91cb41f984b0e46cd43d13a622414a) Thanks [@fkatsuhiro](https://github.com/fkatsuhiro)! - Fix "Find All References" and other TypeScript features by ensuring the plugin bundle is correctly included
+
+- [#15109](https://github.com/withastro/astro/pull/15109) [`e062101`](https://github.com/withastro/astro/commit/e062101b3c7ca14502a53c65ee7a85070faa1e9f) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Fixes syntax highlighting sometimes not working when the frontmatter or script tags ended with certain TypeScript constructs
+
+## 2.16.5
+
+### Patch Changes
+
+- [#14988](https://github.com/withastro/astro/pull/14988) [`a3a20d8`](https://github.com/withastro/astro/commit/a3a20d8c9783de10de64d2f15dacdd5afc97a5ad) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Retries failed deploy
+
+## 2.16.4
+
+### Patch Changes
+
+- [#14916](https://github.com/withastro/astro/pull/14916) [`f00aa2b`](https://github.com/withastro/astro/commit/f00aa2bf164cdf0b281a6889b47e32afdfcdad69) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Retry failed publish (again)
+
+## 2.16.3
+
+### Patch Changes
+
+- [#14911](https://github.com/withastro/astro/pull/14911) [`fcdf52f`](https://github.com/withastro/astro/commit/fcdf52fe0ec871f42bb9883d43fac67452405eca) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Retry failed publish
+
+## 2.16.2
+
+### Patch Changes
+
+- [#14909](https://github.com/withastro/astro/pull/14909) [`629d86b`](https://github.com/withastro/astro/commit/629d86b8279ea27c3a56843fd772c3fe11b27983) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Fixes borked publish
+
+## 2.16.1
+
+### Patch Changes
+
+- [#14740](https://github.com/withastro/astro/pull/14740) [`abfed97`](https://github.com/withastro/astro/commit/abfed97d45ab04c625d6463f9be1e5b1d23c3573) Thanks [@ArmandPhilippot](https://github.com/ArmandPhilippot)! - Fixes link targets in documentation following repository relocation.
+
+- [#14710](https://github.com/withastro/astro/pull/14710) [`c6903cd`](https://github.com/withastro/astro/commit/c6903cd6ce20e17d6604ea3412bd66ea8387d079) Thanks [@RomanHauksson](https://github.com/RomanHauksson)! - Fixes the displayed description for the Content-intellisense setting to refer to the correct configuration file option
+
 ## 2.16.0
 
 ### Minor Changes
 
-- [#14584](https://github.com/withastro/astro/pull/14584) [`3c7ab17`](https://github.com/withastro/astro/commit/3c7ab178da26d095777495bcee94b468937936a3) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Adds a new setting for disabling the Auto Import Cache. The cache can cause an issue where new files are not able to be automatically imported using autocomplete in certain cases. Check https://github.com/withastro/language-tools/issues/1035 for more details.
+- [#14584](https://github.com/withastro/astro/pull/14584) [`3c7ab17`](https://github.com/withastro/astro/commit/3c7ab178da26d095777495bcee94b468937936a3) Thanks [@Princesseuh](https://github.com/Princesseuh)! - Adds a new setting for disabling the Auto Import Cache. The cache can cause an issue where new files are not able to be automatically imported using autocomplete in certain cases. Check https://github.com/withastro/astro/issues/14642 for more details.
 
 ## 2.15.5
 
@@ -29,7 +151,7 @@
 
 ### Patch Changes
 
-- 43f66cd: Fixes publishing on OpenVSX. For full changelogs between 2.11.0 and this version, please see [CHANGELOG.md](https://github.com/withastro/language-tools/blob/main/packages/vscode/CHANGELOG.md) in the repository.
+- 43f66cd: Fixes publishing on OpenVSX. For full changelogs between 2.11.0 and this version, please see [CHANGELOG.md](https://github.com/withastro/astro/blob/main/packages/language-tools/vscode/CHANGELOG.md) in the repository.
 
 ## 2.15.1
 
@@ -765,7 +887,7 @@ In the background, this update means that we now have to maintain a lot less cod
 
 ### Patch Changes
 
-- c4f7a36: Trying desesperately to figure deployment out
+- c4f7a36: Trying desperately to figure deployment out
 
 ## 0.26.0
 

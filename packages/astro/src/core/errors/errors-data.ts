@@ -2,7 +2,7 @@
 // Additionally, this code, much like `types/public/config.ts`, is used to generate documentation, so make sure to pass
 // your changes by our wonderful docs team before merging!
 
-import type { ZodError } from 'zod';
+import type { $ZodError } from 'zod/v4/core';
 
 export interface ErrorData {
 	name: string;
@@ -38,8 +38,8 @@ export const UnknownCompilerError = {
 /**
  * @docs
  * @see
- * - [Official integrations](https://docs.astro.build/en/guides/integrations-guide/#official-integrations)
- * - [Astro.clientAddress](https://docs.astro.build/en/reference/api-reference/#clientaddress)
+ * - [Official integrations](https://docs.astro.build/en/guides/integrations/#official-integrations)
+ * - [`Astro.clientAddress`](https://docs.astro.build/en/reference/api-reference/#clientaddress)
  * @description
  * The adapter you're using unfortunately does not support `Astro.clientAddress`.
  */
@@ -53,7 +53,7 @@ export const ClientAddressNotAvailable = {
  * @docs
  * @see
  * - [On-demand rendering](https://docs.astro.build/en/guides/on-demand-rendering/)
- * - [Astro.clientAddress](https://docs.astro.build/en/reference/api-reference/#clientaddress)
+ * - [`Astro.clientAddress`](https://docs.astro.build/en/reference/api-reference/#clientaddress)
  * @description
  * The `Astro.clientAddress` property cannot be used inside prerendered routes.
  */
@@ -61,13 +61,13 @@ export const PrerenderClientAddressNotAvailable = {
 	name: 'PrerenderClientAddressNotAvailable',
 	title: '`Astro.clientAddress` cannot be used inside prerendered routes.',
 	message: (name: string) =>
-		`\`Astro.clientAddress\` cannot be used inside prerendered route ${name}`,
+		`\`Astro.clientAddress\` cannot be used inside prerendered route ${name}.`,
 } satisfies ErrorData;
 /**
  * @docs
  * @see
  * - [Enabling SSR in Your Project](https://docs.astro.build/en/guides/on-demand-rendering/)
- * - [Astro.clientAddress](https://docs.astro.build/en/reference/api-reference/#clientaddress)
+ * - [`Astro.clientAddress`](https://docs.astro.build/en/reference/api-reference/#clientaddress)
  * @description
  * The `Astro.clientAddress` property is only available when [Server-side rendering](https://docs.astro.build/en/guides/on-demand-rendering/) is enabled.
  *
@@ -82,7 +82,7 @@ export const StaticClientAddressNotAvailable = {
 /**
  * @docs
  * @see
- * - [getStaticPaths()](https://docs.astro.build/en/reference/routing-reference/#getstaticpaths)
+ * - [`getStaticPaths()`](https://docs.astro.build/en/reference/routing-reference/#getstaticpaths)
  * @description
  * A [dynamic route](https://docs.astro.build/en/guides/routing/#dynamic-routes) was matched, but no corresponding path was found for the requested parameters. This is often caused by a typo in either the generated or the requested path.
  */
@@ -108,7 +108,7 @@ export const NoMatchingStaticPathFound = {
  *  statusText: 'Not found'
  * });
  *
- * // Alternatively, for redirects, Astro.redirect also returns an instance of Response
+ * // Alternatively, for redirects, `Astro.redirect()` also returns an instance of `Response`
  * return Astro.redirect('/login');
  * ---
  * ```
@@ -138,14 +138,14 @@ export const MissingMediaQueryDirective = {
 	name: 'MissingMediaQueryDirective',
 	title: 'Missing value for `client:media` directive.',
 	message:
-		'Media query not provided for `client:media` directive. A media query similar to `client:media="(max-width: 600px)"` must be provided',
+		'Media query not provided for `client:media` directive. A media query similar to `client:media="(max-width: 600px)"` must be provided.',
 } satisfies ErrorData;
 /**
  * @docs
  * @message Unable to render `COMPONENT_NAME`. There are `RENDERER_COUNT` renderer(s) configured in your `astro.config.mjs` file, but none were able to server-side render `COMPONENT_NAME`.
  * @see
  * - [Frameworks components](https://docs.astro.build/en/guides/framework-components/)
- * - [UI Frameworks](https://docs.astro.build/en/guides/integrations-guide/#official-integrations)
+ * - [UI Frameworks](https://docs.astro.build/en/guides/integrations/#official-integrations)
  * @description
  * None of the installed integrations were able to render the component you imported. Make sure to install the appropriate integration for the type of component you are trying to include in your page.
  *
@@ -209,7 +209,7 @@ export const NoClientOnlyHint = {
 	message: (componentName: string) =>
 		`Unable to render \`${componentName}\`. When using the \`client:only\` hydration strategy, Astro needs a hint to use the correct renderer.`,
 	hint: (probableRenderers: string) =>
-		`Did you mean to pass \`client:only="${probableRenderers}"\`? See https://docs.astro.build/en/reference/directives-reference/#clientonly for more information on client:only`,
+		`Did you mean to pass \`client:only="${probableRenderers}"\`? See https://docs.astro.build/en/reference/directives-reference/#clientonly for more information on \`client:only\`.`,
 } satisfies ErrorData;
 /**
  * @docs
@@ -217,14 +217,14 @@ export const NoClientOnlyHint = {
  * - [`getStaticPaths()`](https://docs.astro.build/en/reference/routing-reference/#getstaticpaths)
  * - [`params`](https://docs.astro.build/en/reference/api-reference/#params)
  * @description
- * The `params` property in `getStaticPaths`'s return value (an array of objects) should also be an object.
+ * The `params` property in `getStaticPaths()`'s return value (an array of objects) should also be an object.
  *
  * ```astro title="pages/blog/[id].astro"
  * ---
  * export async function getStaticPaths() {
  *	return [
- *		{ params: { slug: "blog" } },
- * 		{ params: { slug: "about" } }
+ *		{ params: { id: "blog" } },
+ * 		{ params: { id: "about" } }
  * 	];
  *}
  *---
@@ -232,33 +232,33 @@ export const NoClientOnlyHint = {
  */
 export const InvalidGetStaticPathParam = {
 	name: 'InvalidGetStaticPathParam',
-	title: 'Invalid value returned by a `getStaticPaths` path.',
+	title: 'Invalid value returned by a route from `getStaticPaths()`.',
 	message: (paramType) =>
-		`Invalid params given to \`getStaticPaths\` path. Expected an \`object\`, got \`${paramType}\``,
-	hint: 'See https://docs.astro.build/en/reference/routing-reference/#getstaticpaths for more information on getStaticPaths.',
+		`Invalid \`params\` value returned by a route from \`getStaticPaths()\`. Expected an \`object\`, got \`${paramType}\`.`,
+	hint: 'See https://docs.astro.build/en/reference/routing-reference/#getstaticpaths for more information on `getStaticPaths()`.',
 } satisfies ErrorData;
 /**
  * @docs
  * @see
  * - [`getStaticPaths()`](https://docs.astro.build/en/reference/routing-reference/#getstaticpaths)
  * @description
- * `getStaticPaths`'s return value must be an array of objects. In most cases, this error happens because an array of array was returned. Using [`.flatMap()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flatMap) or a [`.flat()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flat) call may be useful.
+ * `getStaticPaths()`'s return value must be an array of objects. In most cases, this error happens because an array of arrays was returned. Using [`.flatMap()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flatMap) or a [`.flat()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flat) call may be useful.
  *
  * ```ts title="pages/blog/[id].astro"
  * export async function getStaticPaths() {
  *	return [ // <-- Array
- *		{ params: { slug: "blog" } }, // <-- Object
- * 		{ params: { slug: "about" } }
+ *		{ params: { id: "blog" } }, // <-- Object
+ * 		{ params: { id: "about" } }
  * 	];
  *}
  * ```
  */
 export const InvalidGetStaticPathsEntry = {
 	name: 'InvalidGetStaticPathsEntry',
-	title: "Invalid entry inside getStaticPath's return value",
+	title: "Invalid entry inside `getStaticPaths()`'s return value.",
 	message: (entryType) =>
-		`Invalid entry returned by getStaticPaths. Expected an object, got \`${entryType}\``,
-	hint: "If you're using a `.map` call, you might be looking for `.flatMap()` instead. See https://docs.astro.build/en/reference/routing-reference/#getstaticpaths for more information on getStaticPaths.",
+		`Invalid entry returned by \`getStaticPaths()\`. Expected an object, got \`${entryType}\`.`,
+	hint: "If you're using a `.map` call, you might be looking for `.flatMap()` instead. See https://docs.astro.build/en/reference/routing-reference/#getstaticpaths for more information on `getStaticPaths()`.",
 } satisfies ErrorData;
 /**
  * @docs
@@ -266,23 +266,23 @@ export const InvalidGetStaticPathsEntry = {
  * - [`getStaticPaths()`](https://docs.astro.build/en/reference/routing-reference/#getstaticpaths)
  * - [`params`](https://docs.astro.build/en/reference/api-reference/#params)
  * @description
- * `getStaticPaths`'s return value must be an array of objects.
+ * `getStaticPaths()`'s return value must be an array of objects.
  *
  * ```ts title="pages/blog/[id].astro"
  * export async function getStaticPaths() {
  *	return [ // <-- Array
- *		{ params: { slug: "blog" } },
- * 		{ params: { slug: "about" } }
+ *		{ params: { id: "blog" } },
+ * 		{ params: { id: "about" } }
  * 	];
  *}
  * ```
  */
 export const InvalidGetStaticPathsReturn = {
 	name: 'InvalidGetStaticPathsReturn',
-	title: 'Invalid value returned by getStaticPaths.',
+	title: 'Invalid value returned by `getStaticPaths()`.',
 	message: (returnType) =>
-		`Invalid type returned by \`getStaticPaths\`. Expected an \`array\`, got \`${returnType}\``,
-	hint: 'See https://docs.astro.build/en/reference/routing-reference/#getstaticpaths for more information on getStaticPaths.',
+		`Invalid type returned by \`getStaticPaths()\`. Expected an \`array\`, got \`${returnType}\`.`,
+	hint: 'See https://docs.astro.build/en/reference/routing-reference/#getstaticpaths for more information on `getStaticPaths()`.',
 } satisfies ErrorData;
 
 /**
@@ -291,7 +291,7 @@ export const InvalidGetStaticPathsReturn = {
  * - [`getStaticPaths()`](https://docs.astro.build/en/reference/routing-reference/#getstaticpaths)
  * - [`params`](https://docs.astro.build/en/reference/api-reference/#params)
  * @description
- * Every route specified by `getStaticPaths` require a `params` property specifying the path parameters needed to match the route.
+ * Every route specified by `getStaticPaths()` requires a `params` property specifying the path parameters needed to match the route.
  *
  * For instance, the following code:
  * ```astro title="pages/blog/[id].astro"
@@ -307,9 +307,9 @@ export const InvalidGetStaticPathsReturn = {
  */
 export const GetStaticPathsExpectedParams = {
 	name: 'GetStaticPathsExpectedParams',
-	title: 'Missing params property on `getStaticPaths` route.',
-	message: 'Missing or empty required `params` property on `getStaticPaths` route.',
-	hint: 'See https://docs.astro.build/en/reference/routing-reference/#getstaticpaths for more information on getStaticPaths.',
+	title: 'Missing params property on `getStaticPaths()` route.',
+	message: 'Missing or empty required `params` property on `getStaticPaths()` route.',
+	hint: 'See https://docs.astro.build/en/reference/routing-reference/#getstaticpaths for more information on `getStaticPaths()`.',
 } satisfies ErrorData;
 /**
  * @docs
@@ -324,8 +324,9 @@ export const GetStaticPathsExpectedParams = {
  * export async function getStaticPaths() {
  * 	return [
  * 		{ params: { id: '1' } } // Works
- * 		{ params: { id: 2 } } // Works
+ * 		{ params: { id: 2 } } // Does not work
  * 		{ params: { id: false } } // Does not work
+ * 		{ params: { id: [1, 2] } } // Does not work
  * 	];
  * }
  * ---
@@ -337,8 +338,8 @@ export const GetStaticPathsExpectedParams = {
  * ---
  * export async function getStaticPaths() {
  * 	return [
- * 		{ params: { id: 1 } } // /route/1
- * 		{ params: { id: 2 } } // /route/2
+ * 		{ params: { id: '1' } } // /route/1
+ * 		{ params: { id: '2' } } // /route/2
  * 		{ params: { id: undefined } } // /route/
  * 	];
  * }
@@ -347,25 +348,25 @@ export const GetStaticPathsExpectedParams = {
  */
 export const GetStaticPathsInvalidRouteParam = {
 	name: 'GetStaticPathsInvalidRouteParam',
-	title: 'Invalid value for `getStaticPaths` route parameter.',
-	message: (key: string, value: any, valueType: any) =>
-		`Invalid getStaticPaths route parameter for \`${key}\`. Expected undefined, a string or a number, received \`${valueType}\` (\`${value}\`)`,
-	hint: 'See https://docs.astro.build/en/reference/routing-reference/#getstaticpaths for more information on getStaticPaths.',
+	title: 'Invalid route parameter returned by `getStaticPaths()`.',
+	message: (key: string, value: any, valueType: string) =>
+		`Invalid \`getStaticPaths()\` route parameter for \`${key}\`. Expected a string or undefined, received \`${valueType}\` (\`${value}\`).`,
+	hint: 'See https://docs.astro.build/en/reference/routing-reference/#getstaticpaths for more information on `getStaticPaths()`.',
 } satisfies ErrorData;
 /**
  * @docs
  * @see
  * - [Dynamic Routes](https://docs.astro.build/en/guides/routing/#dynamic-routes)
  * - [`getStaticPaths()`](https://docs.astro.build/en/reference/routing-reference/#getstaticpaths)
- * - [Server-side Rendering](https://docs.astro.build/en/guides/on-demand-rendering/)
+ * - [Server-side rendering](https://docs.astro.build/en/guides/on-demand-rendering/)
  * @description
- * In [Static Mode](https://docs.astro.build/en/guides/routing/#static-ssg-mode), all routes must be determined at build time. As such, dynamic routes must `export` a `getStaticPaths` function returning the different paths to generate.
+ * In [Static Mode](https://docs.astro.build/en/guides/routing/#static-ssg-mode), all routes must be determined at build time. As such, dynamic routes must `export` a `getStaticPaths()` function returning the different paths to generate.
  */
 export const GetStaticPathsRequired = {
 	name: 'GetStaticPathsRequired',
 	title: '`getStaticPaths()` function required for dynamic routes.',
 	message:
-		'`getStaticPaths()` function is required for dynamic routes. Make sure that you `export` a `getStaticPaths` function from your dynamic route.',
+		'`getStaticPaths()` function is required for dynamic routes. Make sure that you `export` a `getStaticPaths()` function from your dynamic route.',
 	hint: `See https://docs.astro.build/en/guides/routing/#dynamic-routes for more information on dynamic routes.
 
 	If you meant for this route to be server-rendered, set \`export const prerender = false;\` in the page.`,
@@ -386,13 +387,13 @@ export const ReservedSlotName = {
 /**
  * @docs
  * @see
- * - [Server-side Rendering](https://docs.astro.build/en/guides/on-demand-rendering/)
+ * - [Server-side rendering](https://docs.astro.build/en/guides/on-demand-rendering/)
  * @description
  * To use server-side rendering, an adapter needs to be installed so Astro knows how to generate the proper output for your targeted deployment platform.
  */
 export const NoAdapterInstalled = {
 	name: 'NoAdapterInstalled',
-	title: 'Cannot use Server-side Rendering without an adapter.',
+	title: 'Cannot use server-side rendering without an adapter.',
 	message: `Cannot use server-rendered pages without an adapter. Please install and configure the appropriate server adapter for your final deployment.`,
 	hint: 'See https://docs.astro.build/en/guides/on-demand-rendering/ for more information.',
 } satisfies ErrorData;
@@ -400,7 +401,7 @@ export const NoAdapterInstalled = {
 /**
  * @docs
  * @see
- * - [Server-side Rendering](https://docs.astro.build/en/guides/on-demand-rendering/)
+ * - [Server-side rendering](https://docs.astro.build/en/guides/on-demand-rendering/)
  * @description
  * The currently configured adapter does not support server-side rendering, which is required for the current project setup.
  *
@@ -419,11 +420,11 @@ export const AdapterSupportOutputMismatch = {
  * @see
  * - [On-demand Rendering](https://docs.astro.build/en/guides/on-demand-rendering/)
  * @description
- * To use server islands, the same constraints exist as for sever-side rendering, so an adapter is needed.
+ * To use server islands, the same constraints exist as for server-side rendering, so an adapter is needed.
  */
 export const NoAdapterInstalledServerIslands = {
 	name: 'NoAdapterInstalledServerIslands',
-	title: 'Cannot use Server Islands without an adapter.',
+	title: 'Cannot use server islands without an adapter.',
 	message: `Cannot use server islands without an adapter. Please install and configure the appropriate server adapter for your final deployment.`,
 	hint: 'See https://docs.astro.build/en/guides/on-demand-rendering/ for more information.',
 } satisfies ErrorData;
@@ -450,8 +451,8 @@ export const NoMatchingImport = {
 export const InvalidPrerenderExport = {
 	name: 'InvalidPrerenderExport',
 	title: 'Invalid prerender export.',
-	message(prefix: string, suffix: string, isHydridOutput: boolean) {
-		const defaultExpectedValue = isHydridOutput ? 'false' : 'true';
+	message(prefix: string, suffix: string, isHybridOutput: boolean) {
+		const defaultExpectedValue = isHybridOutput ? 'false' : 'true';
 		let msg = `A \`prerender\` export has been detected, but its value cannot be statically analyzed.`;
 		if (prefix !== 'const') msg += `\nExpected \`const\` declaration but got \`${prefix}\`.`;
 		if (suffix !== 'true')
@@ -535,7 +536,7 @@ export const InvalidImageService = {
  */
 export const MissingImageDimension = {
 	name: 'MissingImageDimension',
-	title: 'Missing image dimensions',
+	title: 'Missing image dimensions.',
 	message: (missingDimension: 'width' | 'height' | 'both', imageURL: string) =>
 		`Missing ${
 			missingDimension === 'both' ? 'width and height attributes' : `${missingDimension} attribute`
@@ -551,9 +552,23 @@ export const MissingImageDimension = {
  */
 export const FailedToFetchRemoteImageDimensions = {
 	name: 'FailedToFetchRemoteImageDimensions',
-	title: 'Failed to retrieve remote image dimensions',
+	title: 'Failed to retrieve remote image dimensions.',
 	message: (imageURL: string) => `Failed to get the dimensions for ${imageURL}.`,
 	hint: 'Verify your remote image URL is accurate, and that you are not using `inferSize` with a file located in your `public/` folder.',
+} satisfies ErrorData;
+/**
+ * @docs
+ * @message
+ * Remote image `IMAGE_URL` is not allowed by your image configuration.
+ * @description
+ * The remote image URL does not match your configured `image.domains` or `image.remotePatterns`.
+ */
+export const RemoteImageNotAllowed = {
+	name: 'RemoteImageNotAllowed',
+	title: 'Remote image is not allowed.',
+	message: (imageURL: string) =>
+		`Remote image ${imageURL} is not allowed by your image configuration.`,
+	hint: 'Update `image.domains` or `image.remotePatterns`, or remove `inferSize` for this image.',
 } satisfies ErrorData;
 /**
  * @docs
@@ -571,7 +586,7 @@ export const FailedToFetchRemoteImageDimensions = {
  */
 export const UnsupportedImageFormat = {
 	name: 'UnsupportedImageFormat',
-	title: 'Unsupported image format',
+	title: 'Unsupported image format.',
 	message: (format: string, imagePath: string, supportedFormats: readonly string[]) =>
 		`Received unsupported format \`${format}\` from \`${imagePath}\`. Currently only ${supportedFormats.join(
 			', ',
@@ -588,9 +603,21 @@ export const UnsupportedImageFormat = {
  */
 export const UnsupportedImageConversion = {
 	name: 'UnsupportedImageConversion',
-	title: 'Unsupported image conversion',
+	title: 'Unsupported image conversion.',
 	message:
 		'Converting between vector (such as SVGs) and raster (such as PNGs and JPEGs) images is not currently supported.',
+} satisfies ErrorData;
+
+/**
+ * @docs
+ * @message An error occurred while optimizing the SVG file with the optimizer.
+ */
+export const CannotOptimizeSvg = {
+	name: 'CannotOptimizeSvg',
+	title: 'Cannot optimize SVG.',
+	message: (path: string, name: string) =>
+		`An error occurred while optimizing SVG file "${path}" with the "${name}" optimizer.`,
+	hint: 'Review the included error message provided for guidance.',
 } satisfies ErrorData;
 
 /**
@@ -615,8 +642,8 @@ export const PrerenderDynamicEndpointPathCollide = {
 /**
  * @docs
  * @see
- * - [`getStaticPaths()`](https://docs.astro.build/en/reference/routing-reference/#getstaticpaths)
- * - [`params`](https://docs.astro.build/en/reference/api-reference/#params)
+ * - [Route Priority Order](https://docs.astro.build/en/guides/routing/#route-priority-order)
+ * - [`prerenderConflictBehavior`](https://docs.astro.build/en/reference/configuration-reference/#prerenderconflictbehavior)
  * @description
  * Two prerendered routes generate the same path, resulting in a collision.
  * A static path can only be generated by one route.
@@ -676,7 +703,7 @@ export const ExpectedImageOptions = {
 	name: 'ExpectedImageOptions',
 	title: 'Expected image options.',
 	message: (options: string) =>
-		`Expected getImage() parameter to be an object. Received \`${options}\`.`,
+		`Expected \`getImage()\` parameter to be an object. Received \`${options}\`.`,
 } satisfies ErrorData;
 
 /**
@@ -706,12 +733,42 @@ export const ExpectedNotESMImage = {
  * @docs
  * @see
  * - [Images](https://docs.astro.build/en/guides/images/)
+ * - [`getImage()`](https://docs.astro.build/en/reference/modules/astro-assets/#getimage)
+ * @description
+ * The `getImage()` function is only available on the server. To use images on the client, either render the `src` from `getImage()` during the server render so it can be used in client-side scripts, or use a standard `<img>` tag.
+ *
+ * ```astro
+ * ---
+ * import { getImage } from "astro:assets";
+ * import myImage from "../assets/my_image.png";
+ *
+ * const optimizedImage = await getImage({ src: myImage, width: 300 });
+ * ---
+ *
+ * <script define:vars={{ imageSrc: optimizedImage.src }}>
+ *   // Use imageSrc in client-side code
+ *   document.getElementById('myImage').src = imageSrc;
+ * </script>
+ * ```
+ */
+export const GetImageNotUsedOnServer = {
+	name: 'GetImageNotUsedOnServer',
+	title: '`getImage()` must be used on the server.',
+	message:
+		'`getImage()` should only be used on the server. To use images on the client, render the `src` from `getImage()` during the server render, then pass it to the client for usage.',
+	hint: 'See https://docs.astro.build/en/reference/modules/astro-assets/#getimage for more information on `getImage()`.',
+} satisfies ErrorData;
+
+/**
+ * @docs
+ * @see
+ * - [Images](https://docs.astro.build/en/guides/images/)
  * @description
  * Only one of `densities` or `widths` can be specified. Those attributes are used to construct a `srcset` attribute, which cannot have both `x` and `w` descriptors.
  */
 export const IncompatibleDescriptorOptions = {
 	name: 'IncompatibleDescriptorOptions',
-	title: 'Cannot set both `densities` and `widths`',
+	title: 'Cannot set both `densities` and `widths`.',
 	message:
 		"Only one of `densities` or `widths` can be specified. In most cases, you'll probably want to use only `widths` if you require specific widths.",
 	hint: 'Those attributes are used to construct a `srcset` attribute, which cannot have both `x` and `w` descriptors.',
@@ -874,7 +931,7 @@ export const LocalsNotAnObject = {
 export const LocalsReassigned = {
 	name: 'LocalsReassigned',
 	title: '`locals` must not be reassigned.',
-	message: '`locals` can not be assigned directly.',
+	message: '`locals` cannot be assigned directly.',
 	hint: 'Set a `locals` property instead.',
 } satisfies ErrorData;
 
@@ -916,7 +973,7 @@ export const MiddlewareCantBeLoaded = {
  * @see
  * - [Images](https://docs.astro.build/en/guides/images/)
  * @description
- * When using the default image services, `Image`'s and `getImage`'s `src` parameter must be either an imported image or an URL, it cannot be a string of a filepath.
+ * When using the default image services, `Image`'s and `getImage`'s `src` parameter must be either an imported image or a URL, it cannot be a string of a filepath.
  *
  * For local images from content collections, you can use the [image() schema helper](https://docs.astro.build/en/guides/images/#images-in-content-collections) to resolve the images.
  *
@@ -943,16 +1000,15 @@ export const LocalImageUsedWrongly = {
 	name: 'LocalImageUsedWrongly',
 	title: 'Local images must be imported.',
 	message: (imageFilePath: string) =>
-		`\`Image\`'s and \`getImage\`'s \`src\` parameter must be an imported image or an URL, it cannot be a string filepath. Received \`${imageFilePath}\`.`,
-	hint: 'If you want to use an image from your `src` folder, you need to either import it or if the image is coming from a content collection, use the [image() schema helper](https://docs.astro.build/en/guides/images/#images-in-content-collections). See https://docs.astro.build/en/guides/images/#src-required for more information on the `src` property.',
+		`\`Image\`'s and \`getImage\`'s \`src\` parameter must be an imported image or a URL, it cannot be a string filepath. Received \`${imageFilePath}\`.`,
+	hint: 'If you want to use an image from your `src` folder, you need to either import it or if the image is coming from a content collection, use the [image() schema helper](https://docs.astro.build/en/guides/images/#images-in-content-collections). See https://docs.astro.build/en/reference/modules/astro-assets/#src-required for more information on the `src` property.',
 } satisfies ErrorData;
 
 /**
  * @docs
- * @see
- * - [Astro.glob](https://docs.astro.build/en/reference/api-reference/#astroglob)
  * @description
  * `Astro.glob()` can only be used in `.astro` files. You can use [`import.meta.glob()`](https://vite.dev/guide/features.html#glob-import) instead to achieve the same result.
+ * @deprecated This error was removed in Astro v6.0.0 along with the removal of `Astro.glob()`.
  */
 export const AstroGlobUsedOutside = {
 	name: 'AstroGlobUsedOutside',
@@ -964,10 +1020,9 @@ export const AstroGlobUsedOutside = {
 
 /**
  * @docs
- * @see
- * - [Astro.glob](https://docs.astro.build/en/reference/api-reference/#astroglob)
  * @description
  * `Astro.glob()` did not return any matching files. There might be a typo in the glob pattern.
+ * @deprecated This error was removed in Astro v6.0.0 along with the removal of `Astro.glob()`.
  */
 export const AstroGlobNoMatch = {
 	name: 'AstroGlobNoMatch',
@@ -978,7 +1033,7 @@ export const AstroGlobNoMatch = {
 /**
  * @docs
  * @see
- * - [Astro.redirect](https://docs.astro.build/en/reference/api-reference/#redirect)
+ * - [`Astro.redirect()`](https://docs.astro.build/en/reference/api-reference/#redirect)
  * @description
  * A redirect must be given a location with the `Location` header.
  */
@@ -990,7 +1045,7 @@ export const RedirectWithNoLocation = {
 /**
  * @docs
  * @see
- * - [Astro.redirect](https://docs.astro.build/en/reference/api-reference/#redirect)
+ * - [`Astro.redirect()`](https://docs.astro.build/en/reference/api-reference/#redirect)
  * @description
  * An external redirect must start with http or https, and must be a valid URL.
  */
@@ -1000,6 +1055,33 @@ export const UnsupportedExternalRedirect = {
 	message: (from: string, to: string) =>
 		`The destination URL in the external redirect from "${from}" to "${to}" is unsupported.`,
 	hint: 'An external redirect must start with http or https, and must be a valid URL.',
+} satisfies ErrorData;
+
+/**
+ * @docs
+ * @message
+ * **Example error message:**<br/>
+ * InvalidRedirectDestination: The redirect from "/posts" to "/blog" is invalid. The destination "/blog" does not match any existing route in your project.
+ * @see
+ * - [Configured redirects](https://docs.astro.build/en/guides/routing/#configured-redirects)
+ * @description
+ * A dynamic redirect destination must match an existing route pattern and include
+ * all dynamic parameters from the source route.
+ * This error occurs when a redirect with dynamic parameters points to a destination
+ * that doesn't correspond to any page in your project, or when the destination route
+ * has fewer dynamic parameters than the source route.
+ */
+export const InvalidRedirectDestination = {
+	name: 'InvalidRedirectDestination',
+	title: 'Invalid redirect destination.',
+	message(from: string, to: string, missingParams?: string[]) {
+		if (missingParams && missingParams.length > 0) {
+			const formatted = missingParams.map((p) => `[${p}]`).join(', ');
+			return `The redirect from "${from}" to "${to}" is invalid. The destination route is missing dynamic parameter(s) ${formatted} required by the source route "${from}".`;
+		}
+		return `The redirect from "${from}" to "${to}" is invalid. The destination "${to}" does not match any existing route in your project.`;
+	},
+	hint: 'The destination of a dynamic redirect must include all dynamic parameters from the source route. For example, a redirect from "/old/[slug]" must go to a route that also has a [slug] parameter, like "/new/[slug]".',
 } satisfies ErrorData;
 
 /**
@@ -1040,7 +1122,7 @@ export const MissingSharp = {
 	message:
 		'Could not find Sharp. Please install Sharp (`sharp`) manually into your project or migrate to another image service.',
 	hint: "See Sharp's installation instructions for more information: https://sharp.pixelplumbing.com/install. If you are not relying on `astro:assets` to optimize, transform, or process any images, you can configure a passthrough image service instead of installing Sharp. See https://docs.astro.build/en/reference/errors/missing-sharp for more information.\n\nSee https://docs.astro.build/en/guides/images/#default-image-service for more information on how to migrate to another image service.",
-};
+} satisfies ErrorData;
 // No headings here, that way Vite errors are merged with Astro ones in the docs, which makes more sense to users.
 // Vite Errors - 4xxx
 /**
@@ -1054,7 +1136,7 @@ export const MissingSharp = {
  */
 export const UnknownViteError = {
 	name: 'UnknownViteError',
-	title: 'Unknown Vite Error.',
+	title: 'Unknown Vite error.',
 } satisfies ErrorData;
 /**
  * @docs
@@ -1077,6 +1159,7 @@ export const FailedToLoadModuleSSR = {
  * - [Glob Patterns](https://docs.astro.build/en/guides/imports/#glob-patterns)
  * @description
  * Astro encountered an invalid glob pattern. This is often caused by the glob pattern not being a valid file path.
+ * @deprecated This error was removed in Astro v6.0.0 along with the removal of `Astro.glob()`.
  */
 export const InvalidGlob = {
 	name: 'InvalidGlob',
@@ -1092,7 +1175,7 @@ export const InvalidGlob = {
  */
 export const FailedToFindPageMapSSR = {
 	name: 'FailedToFindPageMapSSR',
-	title: "Astro couldn't find the correct page to render",
+	title: "Astro couldn't find the correct page to render.",
 	message:
 		"Astro couldn't find the correct page to render, probably because it wasn't correctly mapped for SSR usage. This is an internal error. Please file an issue.",
 } satisfies ErrorData;
@@ -1100,7 +1183,7 @@ export const FailedToFindPageMapSSR = {
 /**
  * @docs
  * @description
- * Astro can't find the requested locale. All supported locales must be configured in [i18n.locales](/en/reference/configuration-reference/#i18nlocales) and have corresponding directories within `src/pages/`.
+ * Astro can't find the requested locale. All supported locales must be configured in [`i18n.locales`](https://docs.astro.build/en/reference/configuration-reference/#i18nlocales) and have corresponding directories within `src/pages/`.
  */
 export const MissingLocale = {
 	name: 'MissingLocaleError',
@@ -1135,7 +1218,7 @@ export const MissingIndexForInternationalization = {
  */
 export const IncorrectStrategyForI18n = {
 	name: 'IncorrectStrategyForI18n',
-	title: "You can't use the current function with the current strategy",
+	title: 'Function incompatible with the current strategy.',
 	message: (functionName: string) =>
 		`The function \`${functionName}\` can only be used when the \`i18n.routing.strategy\` is set to \`"manual"\`.`,
 } satisfies ErrorData;
@@ -1149,7 +1232,7 @@ export const NoPrerenderedRoutesWithDomains = {
 	name: 'NoPrerenderedRoutesWithDomains',
 	title: "Prerendered routes aren't supported when internationalization domains are enabled.",
 	message: (component: string) =>
-		`Static pages aren't yet supported with multiple domains. To enable this feature, you must disable prerendering for the page ${component}`,
+		`Static pages aren't yet supported with multiple domains. To enable this feature, you must disable prerendering for the page ${component}.`,
 } satisfies ErrorData;
 
 /**
@@ -1167,6 +1250,18 @@ export const MissingMiddlewareForInternationalization = {
 /**
  * @docs
  * @description
+ * An invalid i18n middleware configuration was detected.
+ */
+export const InvalidI18nMiddlewareConfiguration = {
+	name: 'InvalidI18nMiddlewareConfiguration',
+	title: 'Invalid internationalization middleware configuration.',
+	message:
+		'The option `redirectToDefaultLocale` can be enabled only when `prefixDefaultLocale` is also set to `true`; otherwise, redirects might cause infinite loops. Enable the option `prefixDefaultLocale` to continue to use `redirectToDefaultLocale`, or ensure both are set to `false`.',
+} satisfies ErrorData;
+
+/**
+ * @docs
+ * @description
  * Astro could not find an associated file with content while trying to render the route. This is an Astro error and not a user error. If restarting the dev server does not fix the problem, please file an issue.
  */
 export const CantRenderPage = {
@@ -1174,7 +1269,7 @@ export const CantRenderPage = {
 	title: "Astro can't render the route.",
 	message:
 		'Astro cannot find any content to render for this route. There is no file or redirect associated with this route.',
-	hint: 'If you expect to find a route here, this may be an Astro bug. Please file an issue/restart the dev server',
+	hint: 'If you expect to find a route here, this may be an Astro bug. Please file an issue/restart the dev server.',
 } satisfies ErrorData;
 
 /**
@@ -1184,7 +1279,7 @@ export const CantRenderPage = {
  */
 export const UnhandledRejection = {
 	name: 'UnhandledRejection',
-	title: 'Unhandled rejection',
+	title: 'Unhandled rejection.',
 	message: (stack: string) =>
 		`Astro detected an unhandled rejection. Here's the stack trace:\n${stack}`,
 	hint: 'Make sure your promises all have an `await` or a `.catch()` handler.',
@@ -1193,7 +1288,7 @@ export const UnhandledRejection = {
 /**
  * @docs
  * @description
- * The `astro:i18n` module can not be used without enabling i18n in your Astro config. To enable i18n, add a default locale and a list of supported locales to your Astro config:
+ * The `astro:i18n` module cannot be used without enabling i18n in your Astro config. To enable i18n, add a default locale and a list of supported locales to your Astro config:
  * ```js
  * import { defineConfig } from 'astro'
  * export default defineConfig({
@@ -1211,20 +1306,20 @@ export const UnhandledRejection = {
  */
 export const i18nNotEnabled = {
 	name: 'i18nNotEnabled',
-	title: 'i18n Not Enabled',
-	message: 'The `astro:i18n` module can not be used without enabling i18n in your Astro config.',
+	title: 'Internationalization routing is not enabled.',
+	message: 'The `astro:i18n` module cannot be used without enabling `i18n` in your Astro config.',
 	hint: 'See https://docs.astro.build/en/guides/internationalization for a guide on setting up i18n.',
 } satisfies ErrorData;
 
 /**
  * @docs
  * @description
- * An i18n utility tried to use the locale from a URL path that does not contain one. You can prevent this error by using pathHasLocale to check URLs for a locale first before using i18n utilities.
+ * An i18n utility tried to use the locale from a URL path that does not contain one. You can prevent this error by using `pathHasLocale` to check URLs for a locale first before using i18n utilities.
  *
  */
 export const i18nNoLocaleFoundInPath = {
 	name: 'i18nNoLocaleFoundInPath',
-	title: "The path doesn't contain any locale",
+	title: "The path doesn't contain any locale.",
 	message:
 		"You tried to use an i18n utility on a path that doesn't contain any locale. You can use `pathHasLocale` first to determine if the path has a locale.",
 } satisfies ErrorData;
@@ -1232,7 +1327,7 @@ export const i18nNoLocaleFoundInPath = {
 /**
  * @docs
  * @description
- * Astro couldn't find a route matching the one provided by the user
+ * Astro couldn't find a route matching the one provided by the user.
  */
 export const RouteNotFound = {
 	name: 'RouteNotFound',
@@ -1249,9 +1344,26 @@ export const RouteNotFound = {
  */
 export const EnvInvalidVariables = {
 	name: 'EnvInvalidVariables',
-	title: 'Invalid Environment Variables',
+	title: 'Invalid environment variables.',
 	message: (errors: Array<string>) =>
 		`The following environment variables defined in \`env.schema\` are invalid:\n\n${errors.map((err) => `- ${err}`).join('\n')}\n`,
+} satisfies ErrorData;
+
+/**
+ * @docs
+ * @description
+ * The configured `vite.envPrefix` includes prefixes that match environment variables declared with `access: "secret"` in `env.schema`.
+ * This would cause Vite to expose those secret values in client-side JavaScript bundles, bypassing the `access: "secret"` protection.
+ *
+ * To fix this, either:
+ * - Remove the conflicting prefixes from `vite.envPrefix`, or
+ * - Rename your secret environment variables to use a prefix that is not in `vite.envPrefix`.
+ */
+export const EnvPrefixConflictsWithSecret = {
+	name: 'EnvPrefixConflictsWithSecret',
+	title: '`envPrefix` conflicts with secret environment variables.',
+	message: (conflicts: Array<string>) =>
+		`The following environment variables are declared with \`access: "secret"\` in \`env.schema\`, but their names match a prefix in \`vite.envPrefix\`, which would expose them in client-side bundles:\n\n${conflicts.map((c) => `- ${c}`).join('\n')}\n\nEither remove the conflicting prefixes from \`vite.envPrefix\`, or rename these variables to use a prefix not in \`vite.envPrefix\`.`,
 } satisfies ErrorData;
 
 /**
@@ -1261,7 +1373,7 @@ export const EnvInvalidVariables = {
  */
 export const ServerOnlyModule = {
 	name: 'ServerOnlyModule',
-	title: 'Module is only available server-side',
+	title: 'Module is only available server-side.',
 	message: (name: string) => `The "${name}" module is only available server-side.`,
 } satisfies ErrorData;
 
@@ -1283,9 +1395,9 @@ export const ServerOnlyModule = {
 
 export const RewriteWithBodyUsed = {
 	name: 'RewriteWithBodyUsed',
-	title: 'Cannot use Astro.rewrite after the request body has been read',
+	title: 'Cannot use `Astro.rewrite()` after the request body has been read.',
 	message:
-		'Astro.rewrite() cannot be used if the request body has already been read. If you need to read the body, first clone the request.',
+		'`Astro.rewrite()` cannot be used if the request body has already been read. If you need to read the body, first clone the request.',
 } satisfies ErrorData;
 
 /**
@@ -1299,10 +1411,10 @@ export const ForbiddenRewrite = {
 	title: 'Forbidden rewrite to a static route.',
 	message: (from: string, to: string, component: string) =>
 		`You tried to rewrite the on-demand route '${from}' with the static route '${to}', when using the 'server' output. \n\nThe static route '${to}' is rendered by the component
-'${component}', which is marked as prerendered. This is a forbidden operation because during the build the component '${component}' is compiled to an
+'${component}', which is marked as prerendered. This is a forbidden operation because during the build, the component '${component}' is compiled to an
 HTML file, which can't be retrieved at runtime by Astro.`,
 	hint: (component: string) =>
-		`Add \`export const prerender = false\` to the component '${component}', or use a Astro.redirect().`,
+		`Add \`export const prerender = false\` to the component '${component}', or use \`Astro.redirect()\`.`,
 } satisfies ErrorData;
 
 /**
@@ -1326,7 +1438,7 @@ export const UnknownFilesystemError = {
 export const CannotExtractFontType = {
 	name: 'CannotExtractFontType',
 	title: 'Cannot extract the font type from the given URL.',
-	message: (url: string) => `An error occurred while trying to extract the font type from ${url}`,
+	message: (url: string) => `An error occurred while trying to extract the font type from ${url}.`,
 	hint: 'Open an issue at https://github.com/withastro/astro/issues.',
 } satisfies ErrorData;
 
@@ -1341,79 +1453,103 @@ export const CannotDetermineWeightAndStyleFromFontFile = {
 	name: 'CannotDetermineWeightAndStyleFromFontFile',
 	title: 'Cannot determine weight and style from font file.',
 	message: (family: string, url: string) =>
-		`An error occurred while determining the \`weight\` and \`style\` from local family "${family}" font file: ${url}`,
+		`An error occurred while determining the \`weight\` and \`style\` from local family "${family}" font file: ${url}.`,
 	hint: 'Update your family config and set `weight` and `style` manually instead.',
 } satisfies ErrorData;
 
 /**
  * @docs
  * @description
- * Cannot fetch the given font file
+ * Cannot fetch the given font file.
  * @message
  * An error occurred while fetching font file from the given URL.
  */
 export const CannotFetchFontFile = {
 	name: 'CannotFetchFontFile',
 	title: 'Cannot fetch the given font file.',
-	message: (url: string) => `An error occurred while fetching the font file from ${url}`,
+	message: (url: string) => `An error occurred while fetching the font file from ${url}.`,
 	hint: 'This is often caused by connectivity issues. If the error persists, open an issue at https://github.com/withastro/astro/issues.',
 } satisfies ErrorData;
 
 /**
  * @docs
  * @description
- * Cannot load font provider
+ * Font family not found.
  * @message
- * Astro is unable to load the given font provider. Open an issue on the corresponding provider's repository.
- */
-export const CannotLoadFontProvider = {
-	name: 'CannotLoadFontProvider',
-	title: 'Cannot load font provider',
-	message: (entrypoint: string) => `An error occurred while loading the "${entrypoint}" provider.`,
-	hint: 'This is an issue with the font provider. Please open an issue on their repository.',
-} satisfies ErrorData;
-
-/**
- * @docs
- * @description
- * Font component is used but experimental fonts have not been registered in the config.
- */
-export const ExperimentalFontsNotEnabled = {
-	name: 'ExperimentalFontsNotEnabled',
-	title: 'Experimental fonts are not enabled',
-	message:
-		'The Font component is used but experimental fonts have not been registered in the config.',
-	hint: 'Check that you have enabled experimental fonts and also configured your preferred fonts.',
-} satisfies ErrorData;
-
-/**
- * @docs
- * @description
- * Font family not found
- * @message
- * No data was found for the `cssVariable` passed to the `<Font />` component or to the `getFontData()` function.
+ * No data was found for the `cssVariable` passed to the `<Font />` component.
  */
 export const FontFamilyNotFound = {
 	name: 'FontFamilyNotFound',
-	title: 'Font family not found',
+	title: 'Font family not found.',
 	message: (family: string) =>
 		`No data was found for the \`"${family}"\` family passed to the \`<Font>\` component.`,
-	hint: 'This is often caused by a typo. Check that the `<Font />` component or `getFontData()` function are using a `cssVariable` specified in your config.',
+	hint: 'This is often caused by a typo. Check that the `<Font />` component is using a `cssVariable` specified in your config.',
 } satisfies ErrorData;
 
 /**
  * @docs
  * @description
- * The CSP feature isn't enabled
+ * Font file URL not found.
  * @message
- * The `experimental.csp` configuration isn't enabled.
+ * The URL passed to the `experimental_getFontFileURL()` function is invalid.
  */
-export const CspNotEnabled = {
-	name: 'CspNotEnabled',
-	title: "CSP feature isn't enabled",
-	message: "The `experimental.csp` configuration isn't enabled.",
+export const FontFileUrlNotFound = {
+	name: 'FontFileUrlNotFound',
+	title: 'Font file URL not found.',
+	message: (url: string) =>
+		`The \`"${url}"\` URL passed to the \`experimental_getFontFileURL()\` function is invalid.`,
+	hint: 'Make sure you pass a valid URL, obtained via the \`fontData\` object.',
 } satisfies ErrorData;
 
+/**
+ * @docs
+ * @description
+ * `experimental_getFontFileURL()` requires the request URL with on-demand rendering.
+ */
+export const MissingGetFontFileRequestUrl = {
+	name: 'MissingGetFontFileRequestUrl',
+	title: '`experimental_getFontFileURL()` requires the request URL with on-demand rendering.',
+	hint: 'Pass the request URL as the 2nd argument, for example `Astro.url`.',
+} satisfies ErrorData;
+
+/**
+ * @docs
+ * @description
+ * Unavailable Astro global in `getStaticPaths()`.
+ * @message
+ * The Astro global is not available in `getStaticPaths()`.
+ */
+export const UnavailableAstroGlobal = {
+	name: 'UnavailableAstroGlobal',
+	title: 'Unavailable Astro global in `getStaticPaths()`.',
+	message: (name: string) =>
+		`The Astro global is not available in this scope. Please remove \`Astro.${name}\` from your \`getStaticPaths()\` function.`,
+} satisfies ErrorData;
+
+/**
+ * @docs
+ * @description
+ * Unable to load the logger.
+ * @message
+ * Couldn't load the logger at the given path.
+ */
+export const UnableToLoadLogger = {
+	name: 'UnableToLoadLogger',
+	title: 'Unable to load the logger.',
+	message: (path: string) => `Couldn't load the logger at given path "${path}".`,
+} satisfies ErrorData;
+
+/**
+ * @docs
+ * @description
+ * The configuration of the logger is not serializable.
+ * @message
+ * The configuration of the logger is not serializable.
+ */
+export const LoggerConfigurationNotSerializable = {
+	name: 'LoggerConfigurationNotSerializable',
+	title: 'The configuration of the logger is not serializable.',
+} satisfies ErrorData;
 /**
  * @docs
  * @kind heading
@@ -1429,7 +1565,7 @@ export const CspNotEnabled = {
  */
 export const UnknownCSSError = {
 	name: 'UnknownCSSError',
-	title: 'Unknown CSS Error.',
+	title: 'Unknown CSS error.',
 } satisfies ErrorData;
 /**
  * @docs
@@ -1442,7 +1578,7 @@ export const UnknownCSSError = {
  */
 export const CSSSyntaxError = {
 	name: 'CSSSyntaxError',
-	title: 'CSS Syntax Error.',
+	title: 'CSS syntax error.',
 } satisfies ErrorData;
 /**
  * @docs
@@ -1457,15 +1593,15 @@ export const CSSSyntaxError = {
  */
 export const UnknownMarkdownError = {
 	name: 'UnknownMarkdownError',
-	title: 'Unknown Markdown Error.',
+	title: 'Unknown Markdown error.',
 } satisfies ErrorData;
 /**
  * @docs
  * @message
  * **Example error messages:**<br/>
- * can not read an implicit mapping pair; a colon is missed<br/>
+ * cannot read an implicit mapping pair; a colon is missed<br/>
  * unexpected end of the stream within a double quoted scalar<br/>
- * can not read a block mapping entry; a multiline key may not be an implicit key
+ * cannot read a block mapping entry; a multiline key may not be an implicit key
  * @description
  * Astro encountered an error while parsing the frontmatter of your Markdown file.
  * This is often caused by a mistake in the syntax, such as a missing colon or a missing end quote.
@@ -1522,7 +1658,7 @@ export const UnknownConfigError = {
  * @see
  * - [--config](https://docs.astro.build/en/reference/cli-reference/#--config-path)
  * @description
- * The specified configuration file using `--config` could not be found. Make sure that it exists or that the path is correct
+ * The specified configuration file using `--config` could not be found. Make sure that it exists or that the path is correct.
  */
 export const ConfigNotFound = {
 	name: 'ConfigNotFound',
@@ -1558,7 +1694,7 @@ export const ConfigLegacyKey = {
  */
 export const UnknownCLIError = {
 	name: 'UnknownCLIError',
-	title: 'Unknown CLI Error.',
+	title: 'Unknown CLI error.',
 } satisfies ErrorData;
 /**
  * @docs
@@ -1571,7 +1707,7 @@ export const GenerateContentTypesError = {
 	name: 'GenerateContentTypesError',
 	title: 'Failed to generate content types.',
 	message: (errorMessage: string) =>
-		`\`astro sync\` command failed to generate content collection types: ${errorMessage}`,
+		`\`astro sync\` command failed to generate content collection types: ${errorMessage}.`,
 	hint: (fileName?: string) =>
 		`This error is often caused by a syntax error inside your content, or your content configuration file. Check your ${fileName ?? 'content config'} file for typos.`,
 } satisfies ErrorData;
@@ -1592,7 +1728,7 @@ export const GenerateContentTypesError = {
  */
 export const UnknownContentCollectionError = {
 	name: 'UnknownContentCollectionError',
-	title: 'Unknown Content Collection Error.',
+	title: 'Unknown content collection error.',
 } satisfies ErrorData;
 
 /**
@@ -1603,20 +1739,20 @@ export const UnknownContentCollectionError = {
 export const RenderUndefinedEntryError = {
 	name: 'RenderUndefinedEntryError',
 	title: 'Attempted to render an undefined content collection entry.',
-	hint: 'Check if the entry is undefined before passing it to `render()`',
+	hint: 'Check if the entry is undefined before passing it to `render()`.',
 } satisfies ErrorData;
 
 /**
  * @docs
  * @description
- * The `getDataEntryById` and `getEntryBySlug` functions are deprecated and cannot be used with content layer collections. Use the `getEntry` function instead.
+ * The `getDataEntryById` and `getEntryBySlug` functions are deprecated and cannot be used with content collections. Use the `getEntry` function instead.
  */
 export const GetEntryDeprecationError = {
 	name: 'GetEntryDeprecationError',
 	title: 'Invalid use of `getDataEntryById` or `getEntryBySlug` function.',
 	message: (collection: string, method: string) =>
 		`The \`${method}\` function is deprecated and cannot be used to query the "${collection}" collection. Use \`getEntry\` instead.`,
-	hint: 'Use the `getEntry` or `getCollection` functions to query content layer collections.',
+	hint: 'See https://docs.astro.build/en/guides/upgrade-to/v6/#removed-legacy-content-collections for more information.',
 } satisfies ErrorData;
 
 /**
@@ -1631,16 +1767,17 @@ export const GetEntryDeprecationError = {
  * Make sure that all required fields are present, and that all fields are of the correct type.
  * You can check against the collection schema in your `src/content.config.*` file.
  * See the [Content collections documentation](https://docs.astro.build/en/guides/content-collections/) for more information.
+ * @deprecated This error only applies to legacy content collections which were removed in Astro 6.
  */
 export const InvalidContentEntryFrontmatterError = {
 	name: 'InvalidContentEntryFrontmatterError',
 	title: 'Content entry frontmatter does not match schema.',
-	message(collection: string, entryId: string, error: ZodError) {
+	message(collection: string, entryId: string, error: $ZodError) {
 		return [
 			`**${String(collection)} → ${String(
 				entryId,
 			)}** frontmatter does not match collection schema.`,
-			...error.errors.map((zodError) => zodError.message),
+			...error.issues.map((issue) => `  **${issue.path.join('.')}**: ${issue.message}`),
 		].join('\n');
 	},
 	hint: 'See https://docs.astro.build/en/guides/content-collections/ for more information on content schemas.',
@@ -1650,7 +1787,7 @@ export const InvalidContentEntryFrontmatterError = {
  * @docs
  * @message
  * **Example error message:**<br/>
- * **blog** → **post** frontmatter does not match collection schema.<br/>
+ * **blog** → **post** data does not match collection schema.<br/>
  * "title" is required.<br/>
  * "date" must be a valid date.
  * @description
@@ -1662,14 +1799,68 @@ export const InvalidContentEntryFrontmatterError = {
 export const InvalidContentEntryDataError = {
 	name: 'InvalidContentEntryDataError',
 	title: 'Content entry data does not match schema.',
-	message(collection: string, entryId: string, error: ZodError) {
+	message(collection: string, entryId: string, error: $ZodError) {
 		return [
 			`**${String(collection)} → ${String(entryId)}** data does not match collection schema.\n`,
-			...error.errors.map((zodError) => `  **${zodError.path.join('.')}**: ${zodError.message}`),
+			...error.issues.map((issue) => `  **${issue.path.join('.')}**: ${issue.message}`),
 			'',
 		].join('\n');
 	},
 	hint: 'See https://docs.astro.build/en/guides/content-collections/ for more information on content schemas.',
+} satisfies ErrorData;
+
+/**
+ * @docs
+ * @message
+ * **Example error message:**<br/>
+ * Found legacy content config file in "src/content/config.ts". Please move this file to "src/content.config.ts" and ensure each collection has a loader defined.<br/>
+ * @description
+ * A legacy content config file was found. Move the file to `src/content.config.ts` and update any collection definitions if needed.
+ * See the [Astro 6 migration guide](https://docs.astro.build/en/guides/upgrade-to/v6/#removed-legacy-content-collections) for more information.
+ */
+
+export const LegacyContentConfigError = {
+	name: 'LegacyContentConfigError',
+	title: 'Legacy content config file found.',
+	message: (filename: string) =>
+		`Found legacy content config file in "${filename}". Please move this file to "src/content.config.${filename.split('.').at(-1)}" and ensure each collection has a loader defined.`,
+	hint: 'See https://docs.astro.build/en/guides/upgrade-to/v6/#removed-legacy-content-collections for more information on updating collections.',
+} satisfies ErrorData;
+
+/**
+ * @docs
+ * @message
+ * **Example error message:**<br/>
+ * Collections must have a `loader` defined. Check your collection definitions in your content config file.<br/>
+ * @description
+ * A content collection is missing a `loader` definition. Make sure that each collection in your content config file has a `loader`.
+ * See the [Content collections documentation](https://docs.astro.build/en/guides/content-collections/) for more information.
+ */
+
+export const ContentCollectionMissingLoader = {
+	name: 'ContentCollectionMissingLoader',
+	title: 'Content collection is missing a `loader` definition.',
+	message: (file = 'your content config file') =>
+		`Collections must have a \`loader\` defined. Check your collection definitions in ${file}.`,
+	hint: 'See https://docs.astro.build/en/guides/content-collections/ for more information on content loaders and https://docs.astro.build/en/guides/upgrade-to/v6/#removed-legacy-content-collections for more information on migrating from legacy collections.',
+} satisfies ErrorData;
+
+/**
+ * @docs
+ * @message
+ * **Example error message:**<br/>
+ * Invalid collection type "data". Remove the type from your collection definition in your content config file.
+ * @description
+ * Content collections should no longer have a `type` field. Remove this field from your content config file.
+ * See the [Astro 6 migration guide](https://docs.astro.build/en/guides/upgrade-to/v6/#removed-legacy-content-collections) for more information.
+ */
+
+export const ContentCollectionInvalidType = {
+	name: 'ContentCollectionInvalidType',
+	title: 'Content collection has an invalid `type` field.',
+	message: (type: string, file = 'your content config file') =>
+		`Invalid collection type "${type}". Remove the type from your collection definition in ${file}.`,
+	hint: 'See https://docs.astro.build/en/guides/upgrade-to/v6/#removed-legacy-content-collections for more information on migrating from legacy collections.',
 } satisfies ErrorData;
 
 /**
@@ -1714,10 +1905,10 @@ export const ContentLoaderReturnsInvalidId = {
 export const ContentEntryDataError = {
 	name: 'ContentEntryDataError',
 	title: 'Content entry data does not match schema.',
-	message(collection: string, entryId: string, error: ZodError) {
+	message(collection: string, entryId: string, error: $ZodError) {
 		return [
 			`**${String(collection)} → ${String(entryId)}** data does not match collection schema.\n`,
-			...error.errors.map((zodError) => `  **${zodError.path.join('.')}**: ${zodError.message}`),
+			...error.issues.map((issue) => `  **${issue.path.join('.')}**: ${issue.message}`),
 			'',
 		].join('\n');
 	},
@@ -1732,7 +1923,7 @@ export const ContentEntryDataError = {
  * @description
  * Error in live content config.
  * @see
- * - [Experimental live content](https://docs.astro.build/en/reference/experimental-flags/live-content-collections/)
+ * - [Defining live content schemas](https://docs.astro.build/en/reference/modules/astro-content/#schema-1)
  */
 
 export const LiveContentConfigError = {
@@ -1740,7 +1931,7 @@ export const LiveContentConfigError = {
 	title: 'Error in live content config.',
 	message: (error: string, filename?: string) =>
 		`${error} Check your collection definitions in ${filename ?? 'your live content config file'}.`,
-	hint: 'See https://docs.astro.build/en/reference/experimental-flags/live-content-collections/ for more information on live content collections.',
+	hint: 'See https://docs.astro.build/en/reference/modules/astro-content/#definelivecollection for more information on defining live content collections.',
 } satisfies ErrorData;
 
 /**
@@ -1755,7 +1946,7 @@ export const LiveContentConfigError = {
  */
 export const ContentLoaderInvalidDataError = {
 	name: 'ContentLoaderInvalidDataError',
-	title: 'Content entry is missing an ID',
+	title: 'Content entry is missing an ID.',
 	message(collection: string, extra: string) {
 		return `**${String(collection)}** entry is missing an ID.\n${extra}`;
 	},
@@ -1789,7 +1980,7 @@ export const InvalidContentEntrySlugError = {
  */
 export const ContentSchemaContainsSlugError = {
 	name: 'ContentSchemaContainsSlugError',
-	title: 'Content Schema should not contain `slug`.',
+	title: 'Content schema should not contain `slug`.',
 	message: (collectionName: string) =>
 		`A content collection schema should not contain \`slug\` since it is reserved for slug generation. Remove this from your ${collectionName} collection schema.`,
 	hint: 'See https://docs.astro.build/en/guides/content-collections/ for more on the `slug` field.',
@@ -1874,13 +2065,13 @@ export const UnsupportedConfigTransformError = {
 /**
  * @docs
  * @see
- *  - [Passing a `parser` to the `file` loader](https://docs.astro.build/en/guides/content-collections/#parser-function)
+ *  - [Passing a `parser` to the `file` loader](https://docs.astro.build/en/reference/content-loader-reference/#parser)
  * @description
  * The `file` loader can’t determine which parser to use. Please provide a custom parser (e.g. `csv-parse`) to create a collection from your file type.
  */
 export const FileParserNotFound = {
 	name: 'FileParserNotFound',
-	title: 'File parser not found',
+	title: 'File parser not found.',
 	message: (fileName: string) =>
 		`No parser was found for '${fileName}'. Pass a parser function (e.g. \`parser: csv\`) to the \`file\` loader.`,
 } satisfies ErrorData;
@@ -1888,15 +2079,15 @@ export const FileParserNotFound = {
 /**
  * @docs
  * @see
- *  - [Astro's built-in loaders](https://docs.astro.build/en/guides/content-collections/#built-in-loaders)
+ *  - [Astro's built-in `file()` loader](https://docs.astro.build/en/reference/content-loader-reference/#file-loader)
  * @description
  * The `file` loader must be passed a single local file. Glob patterns are not supported. Use the built-in `glob` loader to create entries from patterns of multiple local files.
  */
 export const FileGlobNotSupported = {
 	name: 'FileGlobNotSupported',
-	title: 'Glob patterns are not supported in the file loader',
+	title: 'Glob patterns are not supported in the file loader.',
 	message: 'Glob patterns are not supported in the `file` loader. Use the `glob` loader instead.',
-	hint: `See Astro's built-in file and glob loaders https://docs.astro.build/en/guides/content-collections/#built-in-loaders for supported usage.`,
+	hint: `See Astro's file loader https://docs.astro.build/en/reference/content-loader-reference/#file-loader for supported usage.`,
 } satisfies ErrorData;
 
 /**
@@ -1916,7 +2107,7 @@ export const ActionsWithoutServerOutputError = {
 	name: 'ActionsWithoutServerOutputError',
 	title: 'Actions must be used with server output.',
 	message:
-		'A server is required to create callable backend functions. To deploy routes to a server, add an adapter to your Astro config and configure your route for on-demand rendering',
+		'A server is required to create callable backend functions. To deploy routes to a server, add an adapter to your Astro config and configure your route for on-demand rendering.',
 	hint: 'Add an adapter and enable on-demand rendering: https://docs.astro.build/en/guides/on-demand-rendering/',
 } satisfies ErrorData;
 
@@ -1957,9 +2148,9 @@ export const ActionNotFoundError = {
  */
 export const ActionCalledFromServerError = {
 	name: 'ActionCalledFromServerError',
-	title: 'Action unexpected called from the server.',
+	title: 'Action called from the server without `Astro.callAction()`.',
 	message:
-		'Action called from a server page or endpoint without using `Astro.callAction()`. This wrapper must be used to call actions from server code.',
+		'Action called from a server-rendered page or endpoint without using `Astro.callAction()`. This wrapper must be used to call actions from server code.',
 	hint: 'See the `Astro.callAction()` reference for usage examples: https://docs.astro.build/en/reference/api-reference/#callaction',
 } satisfies ErrorData;
 
@@ -2018,50 +2209,52 @@ export const SessionStorageSaveError = {
 
 /**
  * @docs
- * @see
- * 	- [Sessions](https://docs.astro.build/en/guides/sessions/)
- * @deprecated This error was removed in Astro 5.7, when the Sessions feature stopped being experimental.
- * @description
- * Your adapter must support server output to use sessions.
+ * @kind heading
+ * @name Cache Errors
  */
-export const SessionWithoutSupportedAdapterOutputError = {
-	name: 'SessionWithoutSupportedAdapterOutputError',
-	title: "Sessions cannot be used with an adapter that doesn't support server output.",
-	message:
-		'Sessions require an adapter that supports server output. The adapter must set `"server"` in the `buildOutput` adapter feature.',
-	hint: 'Ensure your adapter supports `buildOutput: "server"`: https://docs.astro.build/en/reference/adapter-reference/#building-an-adapter',
-} satisfies ErrorData;
+// Cache Errors
 /**
  * @docs
- * @message The `experimental.session` flag was set to `true`, but no storage was configured. Either configure the storage manually or use an adapter that provides session storage.
- * @deprecated This error was removed in Astro 5.7, when the Sessions feature stopped being experimental.
- * @see
- * 	- [Sessions](https://docs.astro.build/en/guides/sessions/)
+ * @message Could not resolve the cache provider `PROVIDER`. Make sure the package is installed.
  * @description
- * Thrown when session storage is enabled but not configured.
+ * Thrown when the configured cache provider cannot be resolved. This usually means the package is not installed or the import path is wrong.
  */
-export const SessionConfigMissingError = {
-	name: 'SessionConfigMissingError',
-	title: 'Session storage was enabled but not configured.',
-	message:
-		'The `experimental.session` flag was set to `true`, but no storage was configured. Either configure the storage manually or use an adapter that provides session storage',
-	hint: 'For more information, see https://docs.astro.build/en/guides/sessions/',
+export const CacheProviderNotFound = {
+	name: 'CacheProviderNotFound',
+	title: 'Cache provider not found.',
+	message: (provider: string) =>
+		`Could not resolve the cache provider \`${provider}\`. Make sure the package is installed.`,
+	hint: "If your adapter provides a default cache provider, you may not need to set one explicitly. Check your adapter's documentation.",
 } satisfies ErrorData;
 
 /**
  * @docs
- * @message Session config was provided without enabling the `experimental.session` flag
- * @deprecated This error was removed in Astro 5.7, when the Sessions feature stopped being experimental.
- * @see
- * 	- [Sessions](https://docs.astro.build/en/guides/sessions/)
+ * @message `Astro.cache` is not available because the cache feature is not enabled.
  * @description
- * Thrown when session storage is configured but the `experimental.session` flag is not enabled.
+ * Thrown when `Astro.cache` or `context.cache` is used but the cache feature has not been enabled in the Astro config.
  */
-export const SessionConfigWithoutFlagError = {
-	name: 'SessionConfigWithoutFlagError',
-	title: 'Session flag not set',
-	message: 'Session config was provided without enabling the `experimental.session` flag',
-	hint: 'For more information, see https://docs.astro.build/en/guides/sessions/',
+export const CacheNotEnabled = {
+	name: 'CacheNotEnabled',
+	title: 'Cache is not enabled.',
+	message:
+		'`Astro.cache` is not available because the cache feature is not enabled. To use caching, configure a cache provider in your Astro config under `experimental.cache`.',
+	hint: 'Use an adapter that provides a default cache provider, or set one explicitly: `experimental: { cache: { provider: "..." } }`. See https://docs.astro.build/en/reference/experimental-flags/route-caching/.',
+} satisfies ErrorData;
+
+/**
+ * @docs
+ * @message `query.include` and `query.exclude` cannot be used together.
+ * @description
+ * The memory cache provider's `query.include` and `query.exclude` options are mutually exclusive.
+ * Use `include` to allowlist specific query parameters that affect the cache key, or `exclude` to
+ * blocklist parameters. When `include` is set, all other parameters are automatically ignored.
+ */
+export const CacheQueryConfigConflict = {
+	name: 'CacheQueryConfigConflict',
+	title: 'Conflicting cache query configuration.',
+	message:
+		'`query.include` and `query.exclude` cannot be used together. Use `include` to allowlist specific parameters, or `exclude` to blocklist them.',
+	hint: 'When using `include`, all parameters not in the list are automatically excluded, making `exclude` redundant.',
 } satisfies ErrorData;
 
 /*
@@ -2073,6 +2266,6 @@ export const SessionConfigWithoutFlagError = {
  * 		- If your message is fully dynamic (ex: lots of conditional logic), make `message` a proper function, like such: `message(parameters) { logic }`.
  * 			Make sure to add a `@message` tag with a static example of the error message, the docs won't be able to parse it otherwise.
  *  	- If your message is static, you can just use a string, `message: "my message"`.
- * 5. Make sure to add a JSdoc comment with the `@docs` tag so that it shows up in the docs, otherwise the error overlay will point to a 404!
+ * 5. Make sure to add a JSdoc comment with the `@docs` tag so that it shows up in the docs; otherwise, the error overlay will point to a 404!
  * For more information, see the README in this folder!
  */

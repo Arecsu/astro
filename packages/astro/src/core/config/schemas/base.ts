@@ -1,19 +1,28 @@
-import type { OutgoingHttpHeaders } from 'node:http';
 import type {
 	RehypePlugin as _RehypePlugin,
 	RemarkPlugin as _RemarkPlugin,
 	RemarkRehype as _RemarkRehype,
+	Smartypants as _Smartypants,
 	ShikiConfig,
-} from '@astrojs/markdown-remark';
-import { markdownConfigDefaults, syntaxHighlightDefaults } from '@astrojs/markdown-remark';
+} from '@astrojs/internal-helpers/markdown';
+import {
+	markdownConfigDefaults,
+	syntaxHighlightDefaults,
+} from '@astrojs/internal-helpers/markdown';
+import { unified } from '@astrojs/markdown-remark';
+import type { MarkdownProcessor } from '../../../markdown/index.js';
+import type { OutgoingHttpHeaders } from 'node:http';
 import { type BuiltinTheme, bundledThemes } from 'shiki';
-import { z } from 'zod';
-import { localFontFamilySchema, remoteFontFamilySchema } from '../../../assets/fonts/config.js';
+import * as z from 'zod/v4';
+import { FontFamilySchema } from '../../../assets/fonts/config.js';
+import { SvgOptimizerSchema } from '../../../assets/svg/config.js';
 import { EnvSchema } from '../../../env/schema.js';
 import type { AstroUserConfig, ViteUserConfig } from '../../../types/public/config.js';
+import { CacheSchema, RouteRulesSchema } from '../../cache/config.js';
 import { allowedDirectivesSchema, cspAlgorithmSchema, cspHashSchema } from '../../csp/config.js';
+import { SessionSchema } from '../../session/config.js';
 
-// The below types are required boilerplate to workaround a Zod issue since v3.21.2. Since that version,
+// The below types are required boilerplate to work around a Zod issue since v3.21.2. Since that version,
 // Zod's compiled TypeScript would "simplify" certain values to their base representation, causing references
 // to transitive dependencies that Astro don't depend on (e.g. `mdast-util-to-hast` or `remark-rehype`). For example:
 //
@@ -27,7 +36,7 @@ import { allowedDirectivesSchema, cspAlgorithmSchema, cspHashSchema } from '../.
 // ```
 //
 // The types below will "complexify" the types so that TypeScript would not simplify them. This way it will
-// reference the complex type directly, instead of referencing non-existent transitive dependencies.
+// reference the complex type directly, instead of referencing nonexistent transitive dependencies.
 //
 // Also, make sure to not index the complexified type, as it would return a simplified value type, which goes
 // back to the issue again. The complexified type should be the base representation that we want to expose.
@@ -46,6 +55,8 @@ type RehypePlugin = ComplexifyWithUnion<_RehypePlugin>;
 type RemarkPlugin = ComplexifyWithUnion<_RemarkPlugin>;
 /** @lintignore */
 export type RemarkRehype = ComplexifyWithOmit<_RemarkRehype>;
+/** @lintignore */
+export type Smartypants = ComplexifyWithOmit<_Smartypants>;
 
 export const ASTRO_CONFIG_DEFAULTS = {
 	root: '.',
@@ -68,6 +79,7 @@ export const ASTRO_CONFIG_DEFAULTS = {
 	image: {
 		endpoint: { entrypoint: undefined, route: '/_image' },
 		service: { entrypoint: 'astro/assets/services/sharp', config: {} },
+		dangerouslyProcessSVG: false,
 		responsiveStyles: false,
 	},
 	devToolbar: {
@@ -84,34 +96,61 @@ export const ASTRO_CONFIG_DEFAULTS = {
 	markdown: markdownConfigDefaults,
 	vite: {},
 	legacy: {
-		collections: false,
+		collectionsBackwardsCompat: false,
 	},
 	redirects: {},
 	security: {
 		checkOrigin: true,
 		allowedDomains: [],
+		csp: false,
+		actionBodySizeLimit: 1024 * 1024,
+		serverIslandBodySizeLimit: 1024 * 1024,
 	},
 	env: {
 		schema: {},
 		validateSecrets: false,
 	},
-	session: undefined,
+	prerenderConflictBehavior: 'warn',
 	experimental: {
+		advancedRouting: false,
 		clientPrerender: false,
 		contentIntellisense: false,
-		headingIdCompat: false,
-		preserveScriptOrder: false,
-		liveContentCollections: false,
-		csp: false,
-		staticImportMetaEnv: false,
 		chromeDevtoolsWorkspace: false,
-		failOnPrerenderConflict: false,
+		rustCompiler: false,
+		queuedRendering: {
+			enabled: false,
+		},
+		logger: {
+			entrypoint: 'astro/logger/node',
+		},
 	},
-} satisfies AstroUserConfig & { server: { open: boolean } };
+} satisfies AstroUserConfig & {
+	server: { open: boolean };
+};
 
 const highlighterTypesSchema = z
 	.union([z.literal('shiki'), z.literal('prism')])
 	.default(syntaxHighlightDefaults.type);
+
+const quoteCharacterMapSchema = z.object({
+	double: z.string(),
+	single: z.string(),
+});
+
+const smartypantsOptionsSchema: z.ZodType<Smartypants> = z.object({
+	backticks: z.union([z.boolean(), z.literal('all')]).default(true),
+	closingQuotes: quoteCharacterMapSchema.default({
+		double: '”',
+		single: '’',
+	}),
+	dashes: z.union([z.boolean(), z.literal('inverted'), z.literal('oldschool')]).default(true),
+	ellipses: z.union([z.boolean(), z.literal('spaced'), z.literal('unspaced')]).default(true),
+	openingQuotes: quoteCharacterMapSchema.default({
+		double: '“',
+		single: '‘',
+	}),
+	quotes: z.boolean().default(true),
+});
 
 export const AstroConfigSchema = z.object({
 	root: z
@@ -140,29 +179,37 @@ export const AstroConfigSchema = z.object({
 		.default(ASTRO_CONFIG_DEFAULTS.cacheDir)
 		.transform((val) => new URL(val)),
 	site: z.string().url().optional(),
-	compressHTML: z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.compressHTML),
+	compressHTML: z
+		.union([z.boolean(), z.literal('jsx')])
+		.optional()
+		.default(ASTRO_CONFIG_DEFAULTS.compressHTML),
 	base: z.string().optional().default(ASTRO_CONFIG_DEFAULTS.base),
 	trailingSlash: z
 		.union([z.literal('always'), z.literal('never'), z.literal('ignore')])
 		.optional()
 		.default(ASTRO_CONFIG_DEFAULTS.trailingSlash),
 	output: z
-		.union([z.literal('static'), z.literal('server')])
+		.union([z.literal('static'), z.literal('server'), z.literal('hybrid')])
 		.optional()
-		.default('static'),
+		.default('static')
+		.refine((val): val is 'static' | 'server' => val !== 'hybrid', {
+			message:
+				'The `output: "hybrid"` option has been removed. Use `output: "static"` (the default) instead, which now behaves the same way.',
+		}),
 	scopedStyleStrategy: z
 		.union([z.literal('where'), z.literal('class'), z.literal('attribute')])
 		.optional()
 		.default('attribute'),
-	adapter: z.object({ name: z.string(), hooks: z.object({}).passthrough().default({}) }).optional(),
-	integrations: z.preprocess(
-		// preprocess
-		(val) => (Array.isArray(val) ? val.flat(Infinity).filter(Boolean) : val),
-		// validate
-		z
-			.array(z.object({ name: z.string(), hooks: z.object({}).passthrough().default({}) }))
-			.default(ASTRO_CONFIG_DEFAULTS.integrations),
-	),
+	adapter: z.object({ name: z.string(), hooks: z.object({}).loose().default({}) }).optional(),
+	integrations: z
+		.preprocess(
+			// preprocess
+			(val) => (Array.isArray(val) ? val.flat(Number.POSITIVE_INFINITY).filter(Boolean) : val),
+			// validate
+			z.array(z.object({ name: z.string(), hooks: z.object({}).loose().default({}) })),
+		)
+		.optional()
+		.default(ASTRO_CONFIG_DEFAULTS.integrations),
 	build: z
 		.object({
 			format: z
@@ -183,7 +230,8 @@ export const AstroConfigSchema = z.object({
 			assetsPrefix: z
 				.string()
 				.optional()
-				.or(z.object({ fallback: z.string() }).and(z.record(z.string())).optional()),
+				.or(z.object({ fallback: z.string() }).and(z.record(z.string(), z.string())))
+				.optional(),
 			serverEntry: z.string().optional().default(ASTRO_CONFIG_DEFAULTS.build.serverEntry),
 			redirects: z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.build.redirects),
 			inlineStylesheets: z
@@ -192,15 +240,15 @@ export const AstroConfigSchema = z.object({
 				.default(ASTRO_CONFIG_DEFAULTS.build.inlineStylesheets),
 			concurrency: z.number().min(1).optional().default(ASTRO_CONFIG_DEFAULTS.build.concurrency),
 		})
-		.default({}),
-	server: z.preprocess(
-		// preprocess
-		// NOTE: Uses the "error" command here because this is overwritten by the
-		// individualized schema parser with the correct command.
-		(val) => (typeof val === 'function' ? val({ command: 'error' }) : val),
-		// validate
-		z
-			.object({
+		.prefault({}),
+	server: z
+		.preprocess(
+			// preprocess
+			// NOTE: Uses the "error" command here because this is overwritten by the
+			// individualized schema parser with the correct command.
+			(val) => (typeof val === 'function' ? val({ command: 'error' }) : val),
+			// validate
+			z.object({
 				open: z
 					.union([z.string(), z.boolean()])
 					.optional()
@@ -215,9 +263,9 @@ export const AstroConfigSchema = z.object({
 					.union([z.array(z.string()), z.literal(true)])
 					.optional()
 					.default(ASTRO_CONFIG_DEFAULTS.server.allowedHosts),
-			})
-			.default({}),
-	),
+			}),
+		)
+		.prefault({}),
 	redirects: z
 		.record(
 			z.string(),
@@ -263,9 +311,10 @@ export const AstroConfigSchema = z.object({
 					entrypoint: z
 						.union([z.literal('astro/assets/services/sharp'), z.string()])
 						.default(ASTRO_CONFIG_DEFAULTS.image.service.entrypoint),
-					config: z.record(z.any()).default({}),
+					config: z.record(z.string(), z.any()).default({}),
 				})
 				.default(ASTRO_CONFIG_DEFAULTS.image.service),
+			dangerouslyProcessSVG: z.boolean().default(ASTRO_CONFIG_DEFAULTS.image.dangerouslyProcessSVG),
 			domains: z.array(z.string()).default([]),
 			remotePatterns: z
 				.array(
@@ -283,10 +332,11 @@ export const AstroConfigSchema = z.object({
 			breakpoints: z.array(z.number()).optional(),
 			responsiveStyles: z.boolean().default(ASTRO_CONFIG_DEFAULTS.image.responsiveStyles),
 		})
-		.default(ASTRO_CONFIG_DEFAULTS.image),
+		.prefault(ASTRO_CONFIG_DEFAULTS.image),
 	devToolbar: z
 		.object({
 			enabled: z.boolean().default(ASTRO_CONFIG_DEFAULTS.devToolbar.enabled),
+			placement: z.enum(['bottom-left', 'bottom-center', 'bottom-right']).optional(),
 		})
 		.default(ASTRO_CONFIG_DEFAULTS.devToolbar),
 	markdown: z
@@ -296,10 +346,7 @@ export const AstroConfigSchema = z.object({
 					z
 						.object({
 							type: highlighterTypesSchema,
-							excludeLangs: z
-								.array(z.string())
-								.optional()
-								.default(syntaxHighlightDefaults.excludeLangs),
+							excludeLangs: z.array(z.string()).optional(),
 						})
 						.default(syntaxHighlightDefaults),
 					highlighterTypesSchema,
@@ -338,10 +385,12 @@ export const AstroConfigSchema = z.object({
 						.default(ASTRO_CONFIG_DEFAULTS.markdown.shikiConfig.theme!),
 					themes: z
 						.record(
+							z.string(),
 							z
 								.enum(Object.keys(bundledThemes) as [BuiltinTheme, ...BuiltinTheme[]])
 								.or(z.custom<ShikiTheme>()),
 						)
+						.optional()
 						.default(ASTRO_CONFIG_DEFAULTS.markdown.shikiConfig.themes!),
 					defaultColor: z
 						.union([z.literal('light'), z.literal('dark'), z.string(), z.literal(false)])
@@ -352,7 +401,7 @@ export const AstroConfigSchema = z.object({
 						.array()
 						.default(ASTRO_CONFIG_DEFAULTS.markdown.shikiConfig.transformers!),
 				})
-				.default({}),
+				.prefault({}),
 			remarkPlugins: z
 				.union([
 					z.string(),
@@ -374,10 +423,41 @@ export const AstroConfigSchema = z.object({
 			remarkRehype: z
 				.custom<RemarkRehype>((data) => data instanceof Object && !Array.isArray(data))
 				.default(ASTRO_CONFIG_DEFAULTS.markdown.remarkRehype),
-			gfm: z.boolean().default(ASTRO_CONFIG_DEFAULTS.markdown.gfm),
-			smartypants: z.boolean().default(ASTRO_CONFIG_DEFAULTS.markdown.smartypants),
+			// Deprecated: left undefined unless the user explicitly sets them, so the
+			// deprecation warning only fires when actually used. The active processor
+			// (`unified()`) supplies the real default (`gfm`/smart punctuation on) when
+			// these are absent.
+			gfm: z.boolean().optional(),
+			smartypants: z
+				.union([z.boolean(), smartypantsOptionsSchema])
+				.transform((val): false | Smartypants => {
+					if (val === true) return smartypantsOptionsSchema.parse({});
+					return val;
+				})
+				.optional(),
+			processor: z
+				.object({
+					name: z.string(),
+					// `z.custom` preserves reference identity; `z.record` would clone, breaking
+					// the closure inside `createRenderer` that reads `processor.options.*`.
+					options: z
+						.custom<object>((v) => typeof v === 'object' && v !== null && !Array.isArray(v))
+						.default(() => ({})),
+					createRenderer: z.custom<MarkdownProcessor['createRenderer']>(
+						(v) => typeof v === 'function',
+					),
+					createMdxRenderer: z
+						.custom<MarkdownProcessor['createMdxRenderer']>(
+							(v) => v === undefined || typeof v === 'function',
+						)
+						.optional(),
+				})
+				// A factory (not a shared value) so every config gets its own processor —
+				// integrations extend the pipeline by mutating `processor.options`, which
+				// would otherwise leak across configs built in the same process.
+				.default(() => unified()),
 		})
-		.default({}),
+		.prefault({}),
 	vite: z
 		.custom<ViteUserConfig>((data) => data instanceof Object && !Array.isArray(data))
 		.default(ASTRO_CONFIG_DEFAULTS.vite),
@@ -390,7 +470,7 @@ export const AstroConfigSchema = z.object({
 						z.string(),
 						z.object({
 							path: z.string(),
-							codes: z.string().array().nonempty(),
+							codes: z.tuple([z.string()], z.string()),
 						}),
 					]),
 				),
@@ -410,13 +490,12 @@ export const AstroConfigSchema = z.object({
 					.or(
 						z.object({
 							prefixDefaultLocale: z.boolean().optional().default(false),
-							// TODO: Astro 6.0 change to false
-							redirectToDefaultLocale: z.boolean().optional().default(true),
+							redirectToDefaultLocale: z.boolean().optional().default(false),
 							fallbackType: z.enum(['redirect', 'rewrite']).optional().default('redirect'),
 						}),
 					)
 					.optional()
-					.default({}),
+					.prefault({}),
 			})
 			.optional(),
 	),
@@ -433,67 +512,17 @@ export const AstroConfigSchema = z.object({
 				)
 				.optional()
 				.default(ASTRO_CONFIG_DEFAULTS.security.allowedDomains),
-		})
-		.optional()
-		.default(ASTRO_CONFIG_DEFAULTS.security),
-	env: z
-		.object({
-			schema: EnvSchema.optional().default(ASTRO_CONFIG_DEFAULTS.env.schema),
-			validateSecrets: z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.env.validateSecrets),
-		})
-		.strict()
-		.optional()
-		.default(ASTRO_CONFIG_DEFAULTS.env),
-	session: z
-		.object({
-			driver: z.string().optional(),
-			options: z.record(z.any()).optional(),
-			cookie: z
-				.object({
-					name: z.string().optional(),
-					domain: z.string().optional(),
-					path: z.string().optional(),
-					maxAge: z.number().optional(),
-					sameSite: z.union([z.enum(['strict', 'lax', 'none']), z.boolean()]).optional(),
-					secure: z.boolean().optional(),
-				})
-				.or(z.string())
-				.transform((val) => {
-					if (typeof val === 'string') {
-						return { name: val };
-					}
-					return val;
-				})
-				.optional(),
-			ttl: z.number().optional(),
-		})
-		.optional(),
-	experimental: z
-		.object({
-			clientPrerender: z
-				.boolean()
+			actionBodySizeLimit: z
+				.number()
 				.optional()
-				.default(ASTRO_CONFIG_DEFAULTS.experimental.clientPrerender),
-			contentIntellisense: z
-				.boolean()
+				.default(ASTRO_CONFIG_DEFAULTS.security.actionBodySizeLimit),
+			serverIslandBodySizeLimit: z
+				.number()
 				.optional()
-				.default(ASTRO_CONFIG_DEFAULTS.experimental.contentIntellisense),
-			headingIdCompat: z
-				.boolean()
-				.optional()
-				.default(ASTRO_CONFIG_DEFAULTS.experimental.headingIdCompat),
-			preserveScriptOrder: z
-				.boolean()
-				.optional()
-				.default(ASTRO_CONFIG_DEFAULTS.experimental.preserveScriptOrder),
-			fonts: z.array(z.union([localFontFamilySchema, remoteFontFamilySchema])).optional(),
-			liveContentCollections: z
-				.boolean()
-				.optional()
-				.default(ASTRO_CONFIG_DEFAULTS.experimental.liveContentCollections),
+				.default(ASTRO_CONFIG_DEFAULTS.security.serverIslandBodySizeLimit),
 			csp: z
 				.union([
-					z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.experimental.csp),
+					z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.security.csp),
 					z.object({
 						algorithm: cspAlgorithmSchema,
 						directives: z.array(allowedDirectivesSchema).optional(),
@@ -513,29 +542,72 @@ export const AstroConfigSchema = z.object({
 					}),
 				])
 				.optional()
-				.default(ASTRO_CONFIG_DEFAULTS.experimental.csp),
-			staticImportMetaEnv: z
+				.default(ASTRO_CONFIG_DEFAULTS.security.csp),
+		})
+		.optional()
+		.default(ASTRO_CONFIG_DEFAULTS.security),
+	env: z
+		.object({
+			schema: EnvSchema.optional().default(ASTRO_CONFIG_DEFAULTS.env.schema),
+			validateSecrets: z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.env.validateSecrets),
+		})
+		.strict()
+		.optional()
+		.default(ASTRO_CONFIG_DEFAULTS.env),
+	session: SessionSchema.optional(),
+	prerenderConflictBehavior: z
+		.enum(['error', 'warn', 'ignore'])
+		.optional()
+		.default(ASTRO_CONFIG_DEFAULTS.prerenderConflictBehavior),
+	fonts: z.array(FontFamilySchema).optional(),
+	experimental: z
+		.strictObject({
+			advancedRouting: z
+				.union([
+					z.boolean(),
+					z.strictObject({
+						fetchFile: z.string().nullable().optional().default('app'),
+					}),
+				])
+				.optional()
+				.default(ASTRO_CONFIG_DEFAULTS.experimental.advancedRouting),
+			clientPrerender: z
 				.boolean()
 				.optional()
-				.default(ASTRO_CONFIG_DEFAULTS.experimental.staticImportMetaEnv),
+				.default(ASTRO_CONFIG_DEFAULTS.experimental.clientPrerender),
+			contentIntellisense: z
+				.boolean()
+				.optional()
+				.default(ASTRO_CONFIG_DEFAULTS.experimental.contentIntellisense),
 			chromeDevtoolsWorkspace: z
 				.boolean()
 				.optional()
 				.default(ASTRO_CONFIG_DEFAULTS.experimental.chromeDevtoolsWorkspace),
-			failOnPrerenderConflict: z
-				.boolean()
+			svgOptimizer: SvgOptimizerSchema.optional(),
+			cache: CacheSchema.optional(),
+			routeRules: RouteRulesSchema.optional(),
+			rustCompiler: z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.experimental.rustCompiler),
+			queuedRendering: z
+				.object({
+					enabled: z.boolean().optional().prefault(false),
+					poolSize: z.number().int().nonnegative().optional(),
+					contentCache: z.boolean().optional(),
+				})
 				.optional()
-				.default(ASTRO_CONFIG_DEFAULTS.experimental.failOnPrerenderConflict),
+				.prefault(ASTRO_CONFIG_DEFAULTS.experimental.queuedRendering),
+			logger: z
+				.object({
+					entrypoint: z.string(),
+					config: z.record(z.string(), z.any()).optional(),
+				})
+				.optional(),
 		})
-		.strict(
-			`Invalid or outdated experimental feature.\nCheck for incorrect spelling or outdated Astro version.\nSee https://docs.astro.build/en/reference/experimental-flags/ for a list of all current experiments.`,
-		)
-		.default({}),
+		.prefault({}),
 	legacy: z
 		.object({
-			collections: z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.legacy.collections),
+			collectionsBackwardsCompat: z.boolean().optional().default(false),
 		})
-		.default({}),
+		.prefault({}),
 });
 
 export type AstroConfigType = z.infer<typeof AstroConfigSchema>;

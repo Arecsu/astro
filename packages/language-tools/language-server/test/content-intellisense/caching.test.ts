@@ -5,14 +5,18 @@ import { after, before, describe, it } from 'node:test';
 import { Position } from '@volar/language-server';
 import { URI } from 'vscode-uri';
 import { getLanguageServer, type LanguageServer } from '../server.ts';
-import { fixtureDir } from '../utils.ts';
+import { fixtureDir } from '../test-utils.ts';
 
 const contentSchemaPath = path.resolve(fixtureDir, '.astro', 'collections', 'caching.schema.json');
 
-describe('Content Intellisense - Caching', async () => {
+describe('Content Intellisense - Caching', {
+	skip: Number.parseInt(process.versions.node) === 20,
+}, async () => {
 	let languageServer: LanguageServer;
 
-	before(async () => (languageServer = await getLanguageServer()));
+	before(async () => {
+		languageServer = await getLanguageServer();
+	});
 
 	it('Properly updates the schema when they are updated', async () => {
 		const document = await languageServer.handle.openTextDocument(

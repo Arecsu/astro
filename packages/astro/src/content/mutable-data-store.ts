@@ -35,6 +35,9 @@ export class MutableDataStore extends ImmutableDataStore {
 	#assetImports = new Set<string>();
 	#moduleImports = new Map<string, string>();
 
+	#writeInProgress = false;
+	#writeQueued = false;
+
 	set(collectionName: string, key: string, value: unknown) {
 		const collection = this._collections.get(collectionName) ?? new Map();
 		collection.set(String(key), value);
@@ -47,17 +50,20 @@ export class MutableDataStore extends ImmutableDataStore {
 		if (collection) {
 			collection.delete(String(key));
 			this.#saveToDiskDebounced();
+			this.#writeAssetsImportsDebounced();
 		}
 	}
 
 	clear(collectionName: string) {
 		this._collections.delete(collectionName);
 		this.#saveToDiskDebounced();
+		this.#writeAssetsImportsDebounced();
 	}
 
 	clearAll() {
 		this._collections.clear();
 		this.#saveToDiskDebounced();
+		this.#writeAssetsImportsDebounced();
 	}
 
 	addAssetImport(assetImport: string, filePath?: string) {
@@ -86,8 +92,32 @@ export class MutableDataStore extends ImmutableDataStore {
 		}
 	}
 
+	/**
+	 * Rebuilds #assetImports from the current entries in _collections.
+	 * This ensures stale import IDs are removed when entries are updated or deleted,
+	 * preventing unrecoverable ImageNotFound errors in astro dev after a content entry's
+	 * image path is temporarily set to an invalid value and then restored.
+	 */
+	#rebuildAssetImports() {
+		this.#assetImports.clear();
+		for (const collection of this._collections.values()) {
+			for (const entry of collection.values()) {
+				const typedEntry = entry as DataEntry;
+				if (typedEntry.assetImports?.length) {
+					for (const assetImport of typedEntry.assetImports) {
+						const id = imageSrcToImportId(assetImport, typedEntry.filePath);
+						if (id) {
+							this.#assetImports.add(id);
+						}
+					}
+				}
+			}
+		}
+	}
+
 	async writeAssetImports(filePath: PathLike) {
 		this.#assetsFile = filePath;
+		this.#rebuildAssetImports();
 
 		if (this.#assetImports.size === 0) {
 			try {
@@ -105,7 +135,9 @@ export class MutableDataStore extends ImmutableDataStore {
 		// We then export them all, mapped by the import id, so we can find them again in the build.
 		const imports: Array<string> = [];
 		const exports: Array<string> = [];
-		this.#assetImports.forEach((id) => {
+		// Sort asset imports to ensure deterministic output across builds
+		const sortedAssetImports = [...this.#assetImports].sort();
+		sortedAssetImports.forEach((id) => {
 			const symbol = importIdToSymbolName(id);
 			imports.push(`import ${symbol} from ${JSON.stringify(id)};`);
 			exports.push(`[${JSON.stringify(id)}, ${symbol}]`);
@@ -141,7 +173,11 @@ export default new Map([${exports.join(', ')}]);
 		// for each asset is an object with path, format and dimensions.
 		// We then export them all, mapped by the import id, so we can find them again in the build.
 		const lines: Array<string> = [];
-		for (const [fileName, specifier] of this.#moduleImports) {
+		// Sort module imports by key to ensure deterministic output across builds
+		const sortedModuleImports = [...this.#moduleImports.entries()].sort(([a], [b]) =>
+			a.localeCompare(b),
+		);
+		for (const [fileName, specifier] of sortedModuleImports) {
 			lines.push(`[${JSON.stringify(fileName)}, () => import(${JSON.stringify(specifier)})]`);
 		}
 		const code = `
@@ -160,6 +196,8 @@ export default new Map([\n${lines.join(',\n')}]);
 			!this.#saveTimeout &&
 			!this.#assetsSaveTimeout &&
 			!this.#modulesSaveTimeout &&
+			!this.#writeQueued &&
+			!this.#writeInProgress &&
 			this.#savePromiseResolve
 		) {
 			this.#savePromiseResolve();
@@ -291,17 +329,7 @@ export default new Map([\n${lines.join(',\n')}]);
 			entries: () => this.entries(collectionName),
 			values: () => this.values(collectionName),
 			keys: () => this.keys(collectionName),
-			set: ({
-				id: key,
-				data,
-				body,
-				filePath,
-				deferredRender,
-				digest,
-				rendered,
-				assetImports,
-				legacyId,
-			}) => {
+			set: ({ id: key, data, body, filePath, deferredRender, digest, rendered, assetImports }) => {
 				if (!key) {
 					throw new Error(`ID must be a non-empty string`);
 				}
@@ -347,9 +375,6 @@ export default new Map([\n${lines.join(',\n')}]);
 				}
 				if (rendered) {
 					entry.rendered = rendered;
-				}
-				if (legacyId) {
-					entry.legacyId = legacyId;
 				}
 				if (deferredRender) {
 					entry.deferredRender = deferredRender;
@@ -397,7 +422,18 @@ export default new Map([\n${lines.join(',\n')}]);
 	}
 
 	toString() {
-		return devalue.stringify(this._collections);
+		// Sort collections and their entries by key to ensure deterministic serialization.
+		// Entry insertion order can vary between builds due to concurrent file processing (pLimit),
+		// so we sort here to guarantee stable output hashes regardless of processing order.
+		const sorted = new Map(
+			[...this._collections.entries()]
+				.sort(([a], [b]) => a.localeCompare(b))
+				.map(([key, collection]) => [
+					key,
+					new Map([...collection.entries()].sort(([a], [b]) => a.localeCompare(b))),
+				]),
+		);
+		return devalue.stringify(sorted);
 	}
 
 	async writeToDisk() {
@@ -407,12 +443,28 @@ export default new Map([\n${lines.join(',\n')}]);
 		if (!this.#file) {
 			throw new AstroError(AstroErrorData.UnknownFilesystemError);
 		}
+		// If a write is already in progress, queue this write and return.
+		// This ensures we don't pass stale data to #writeFileAtomic nor race
+		// with the ongoing execution.
+		if (this.#writeInProgress) {
+			this.#writeQueued = true;
+			return;
+		}
 		try {
 			// Mark as clean before writing to disk so that it catches any changes that happen during the write
 			this.#dirty = false;
+			this.#writeInProgress = true;
 			await this.#writeFileAtomic(this.#file, this.toString());
 		} catch (err) {
 			throw new AstroError(AstroErrorData.UnknownFilesystemError, { cause: err });
+		} finally {
+			this.#writeInProgress = false;
+			if (this.#writeQueued) {
+				// Another request to write came in while th current write was happening.
+				// Write again to ensure we have the latest data.
+				this.#writeQueued = false;
+				await this.writeToDisk();
+			}
 		}
 	}
 

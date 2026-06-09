@@ -1,7 +1,7 @@
 import type { OutgoingHttpHeaders } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { z } from 'zod';
+import * as z from 'zod/v4';
 import { appendForwardSlash, prependForwardSlash, removeTrailingForwardSlash } from '../../path.js';
 import { ASTRO_CONFIG_DEFAULTS, AstroConfigSchema } from './base.js';
 
@@ -28,7 +28,10 @@ export function createRelativeSchema(cmd: string, fileProtocolRoot: string) {
 			.string()
 			.default(ASTRO_CONFIG_DEFAULTS.srcDir)
 			.transform((val) => resolveDirAsUrl(val, fileProtocolRoot)),
-		compressHTML: z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.compressHTML),
+		compressHTML: z
+			.union([z.boolean(), z.literal('jsx')])
+			.optional()
+			.default(ASTRO_CONFIG_DEFAULTS.compressHTML),
 		publicDir: z
 			.string()
 			.default(ASTRO_CONFIG_DEFAULTS.publicDir)
@@ -75,7 +78,7 @@ export function createRelativeSchema(cmd: string, fileProtocolRoot: string) {
 				assetsPrefix: z
 					.string()
 					.optional()
-					.or(z.object({ fallback: z.string() }).and(z.record(z.string())).optional()),
+					.or(z.object({ fallback: z.string() }).and(z.record(z.string(), z.string())).optional()),
 				serverEntry: z.string().optional().default(ASTRO_CONFIG_DEFAULTS.build.serverEntry),
 				redirects: z.boolean().optional().default(ASTRO_CONFIG_DEFAULTS.build.redirects),
 				inlineStylesheets: z
@@ -85,18 +88,18 @@ export function createRelativeSchema(cmd: string, fileProtocolRoot: string) {
 				concurrency: z.number().min(1).optional().default(ASTRO_CONFIG_DEFAULTS.build.concurrency),
 			})
 			.optional()
-			.default({}),
-		server: z.preprocess(
-			// preprocess
-			(val) => {
-				if (typeof val === 'function') {
-					return val({ command: cmd === 'dev' ? 'dev' : 'preview' });
-				}
-				return val;
-			},
-			// validate
-			z
-				.object({
+			.prefault({}),
+		server: z
+			.preprocess(
+				// preprocess
+				(val) => {
+					if (typeof val === 'function') {
+						return val({ command: cmd === 'dev' ? 'dev' : 'preview' });
+					}
+					return val;
+				},
+				// validate
+				z.object({
 					open: z
 						.union([z.string(), z.boolean()])
 						.optional()
@@ -107,17 +110,15 @@ export function createRelativeSchema(cmd: string, fileProtocolRoot: string) {
 						.default(ASTRO_CONFIG_DEFAULTS.server.host),
 					port: z.number().optional().default(ASTRO_CONFIG_DEFAULTS.server.port),
 					headers: z.custom<OutgoingHttpHeaders>().optional(),
-					streaming: z.boolean().optional().default(true),
 					allowedHosts: z
 						.union([z.array(z.string()), z.literal(true)])
 						.optional()
 						.default(ASTRO_CONFIG_DEFAULTS.server.allowedHosts),
-				})
-				.optional()
-				.default({}),
-		),
+				}),
+			)
+			.prefault({}),
 	}).transform((config) => {
-		// If the user changed `outDir`, we need to also update `build.client` and `build.server`
+		// If the user changed `outDir`, we also need to update `build.client` and `build.server`
 		// the be based on the correct `outDir`
 		if (
 			config.outDir.toString() !==

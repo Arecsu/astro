@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import * as z from 'zod/v4';
 
 type UnionToIntersection<U> = (U extends never ? never : (arg: U) => never) extends (
 	arg: infer I,
@@ -6,11 +6,10 @@ type UnionToIntersection<U> = (U extends never ? never : (arg: U) => never) exte
 	? I
 	: never;
 
-type UnionToTuple<T> = UnionToIntersection<T extends never ? never : (t: T) => T> extends (
-	_: never,
-) => infer W
-	? [...UnionToTuple<Exclude<T, W>>, W]
-	: [];
+type UnionToTuple<T> =
+	UnionToIntersection<T extends never ? never : (t: T) => T> extends (_: never) => infer W
+		? [...UnionToTuple<Exclude<T, W>>, W]
+		: [];
 
 export const ALGORITHMS = {
 	'SHA-256': 'sha256-',
@@ -67,11 +66,25 @@ const ALLOWED_DIRECTIVES = [
 type AllowedDirectives = (typeof ALLOWED_DIRECTIVES)[number];
 export type CspDirective = `${AllowedDirectives}${string | undefined}`;
 
-export const allowedDirectivesSchema = z.custom<CspDirective>((value) => {
-	if (typeof value !== 'string') {
-		return false;
-	}
-	return ALLOWED_DIRECTIVES.some((allowedValue) => {
-		return value.startsWith(allowedValue);
+export const allowedDirectivesSchema = z
+	.custom<CspDirective>((v) => typeof v === 'string')
+	.superRefine((value, ctx) => {
+		const isAllowed = ALLOWED_DIRECTIVES.some((allowedValue) => {
+			return value.startsWith(allowedValue);
+		});
+		if (!isAllowed) {
+			if (value.startsWith('script-src') || value.startsWith('style-src')) {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: `Directives \`script-src\` and \`style-src\` are not allowed in \`security.csp.directives\`. Please use \`security.csp.scriptDirective\` and \`security.csp.styleDirective\` instead.`,
+					fatal: true,
+				});
+			} else {
+				ctx.addIssue({
+					code: z.ZodIssueCode.custom,
+					message: `Invalid directive: "${value}". Allowed directives are: ${ALLOWED_DIRECTIVES.join(', ')}`,
+					fatal: true,
+				});
+			}
+		}
 	});
-});

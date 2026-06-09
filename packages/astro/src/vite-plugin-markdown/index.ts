@@ -1,25 +1,23 @@
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import {
-	createMarkdownProcessor,
-	isFrontmatterValid,
-	type MarkdownProcessor,
-} from '@astrojs/markdown-remark';
+import { isFrontmatterValid } from '@astrojs/internal-helpers/frontmatter';
+import type { MarkdownRenderer } from '@astrojs/internal-helpers/markdown';
 import type { Plugin } from 'vite';
 import { safeParseFrontmatter } from '../content/utils.js';
 import { AstroError, AstroErrorData } from '../core/errors/index.js';
-import type { Logger } from '../core/logger/core.js';
+import type { AstroLogger } from '../core/logger/core.js';
 import { isMarkdownFile, isPage } from '../core/util.js';
 import { normalizePath } from '../core/viteUtils.js';
 import { shorthash } from '../runtime/server/shorthash.js';
 import type { AstroSettings } from '../types/astro.js';
 import { createDefaultAstroMetadata } from '../vite-plugin-astro/metadata.js';
-import { getFileInfo } from '../vite-plugin-utils/index.js';
+import { getFileInfo, specialQueriesRE } from '../vite-plugin-utils/index.js';
 import { getMarkdownCodeForImages, type MarkdownImagePath } from './images.js';
+import { SUPPORTED_MARKDOWN_FILE_EXTENSIONS } from '../core/constants.js';
 
 interface AstroPluginOptions {
 	settings: AstroSettings;
-	logger: Logger;
+	logger: AstroLogger;
 }
 
 const astroServerRuntimeModulePath = normalizePath(
@@ -31,44 +29,66 @@ const astroErrorModulePath = normalizePath(
 );
 
 export default function markdown({ settings, logger }: AstroPluginOptions): Plugin {
-	let processor: Promise<MarkdownProcessor> | undefined;
+	let renderer: Promise<MarkdownRenderer> | undefined;
 
 	return {
 		enforce: 'pre',
 		name: 'astro:markdown',
 		buildEnd() {
-			processor = undefined;
+			renderer = undefined;
 		},
-		async resolveId(source, importer, options) {
-			if (importer?.endsWith('.md') && source[0] !== '/') {
-				let resolved = await this.resolve(source, importer, options);
-				if (!resolved) resolved = await this.resolve('./' + source, importer, options);
-				return resolved;
-			}
+		resolveId: {
+			filter: {
+				// Do not match sources that start with /
+				id: /^[^/]/,
+			},
+			async handler(source, importer, options) {
+				if (importer?.endsWith('.md')) {
+					let resolved = await this.resolve(source, importer, options);
+					if (!resolved) resolved = await this.resolve('./' + source, importer, options);
+					return resolved;
+				}
+			},
 		},
 		// Why not the "transform" hook instead of "load" + readFile?
 		// A: Vite transforms all "import.meta.env" references to their values before
 		// passing to the transform hook. This lets us get the truly raw value
 		// to escape "import.meta.env" ourselves.
-		async load(id) {
-			if (isMarkdownFile(id)) {
+		load: {
+			filter: {
+				id: {
+					// Matches .md, .markdown, .md?, .markdown? etc
+					include: new RegExp(
+						`\\.(${SUPPORTED_MARKDOWN_FILE_EXTENSIONS.map((ext) => ext.slice(1)).join('|')})(\\?|$)`,
+					),
+					exclude: specialQueriesRE,
+				},
+			},
+			async handler(id) {
+				// The id filter also matches file extensions in search params which we do not want.
+				// So we check another time, but at least it will run for less ids
+				if (!isMarkdownFile(id)) {
+					return;
+				}
 				const { fileId, fileUrl } = getFileInfo(id, settings.config);
 				const rawFile = await fs.promises.readFile(fileId, 'utf-8');
 				const raw = safeParseFrontmatter(rawFile, id);
 
 				const fileURL = pathToFileURL(fileId);
 
-				// Lazily initialize the Markdown processor
-				if (!processor) {
-					processor = createMarkdownProcessor({
-						image: settings.config.image,
-						experimentalHeadingIdCompat: settings.config.experimental.headingIdCompat,
-						...settings.config.markdown,
+				// Lazily initialize the Markdown renderer
+				if (!renderer) {
+					const { markdown: md, image } = settings.config;
+					renderer = md.processor.createRenderer({
+						image,
+						syntaxHighlight: md.syntaxHighlight,
+						shikiConfig: md.shikiConfig,
+						gfm: md.gfm,
+						smartypants: md.smartypants,
 					});
 				}
 
-				const renderResult = await (await processor).render(raw.content, {
-					// @ts-expect-error passing internal prop
+				const renderResult = await (await renderer).render(raw.content, {
 					fileURL,
 					frontmatter: raw.frontmatter,
 				});
@@ -154,7 +174,7 @@ export default function markdown({ settings, logger }: AstroPluginOptions): Plug
 							}, {
 								'default': () => render\`\${unescapeHTML(html())}\`
 							})}\`;`
-							: `render\`${charset}\${maybeRenderHead(result)}\${unescapeHTML(html())}\`;`
+							: `render\`${charset}\${maybeRenderHead()}\${unescapeHTML(html())}\`;`
 					}
 				});
 				export default Content;
@@ -169,7 +189,7 @@ export default function markdown({ settings, logger }: AstroPluginOptions): Plug
 						},
 					},
 				};
-			}
+			},
 		},
 	};
 }

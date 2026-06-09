@@ -1,338 +1,489 @@
-import { createReadStream } from 'node:fs';
-import { appendFile, stat } from 'node:fs/promises';
-import { createRequire } from 'node:module';
+import { createReadStream, existsSync, readFileSync } from 'node:fs';
+import { appendFile, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { normalizePath } from 'vite';
 import { createInterface } from 'node:readline/promises';
-import { pathToFileURL } from 'node:url';
 import {
-	appendForwardSlash,
-	prependForwardSlash,
 	removeLeadingForwardSlash,
+	removeTrailingForwardSlash,
 } from '@astrojs/internal-helpers/path';
 import { createRedirectsFromAstroRoutes, printAsRedirects } from '@astrojs/underscore-redirects';
-import type {
-	AstroConfig,
-	AstroIntegration,
-	HookParameters,
-	IntegrationResolvedRoute,
-} from 'astro';
-import { AstroError } from 'astro/errors';
-import type { PluginOption } from 'vite';
-import { defaultClientConditions } from 'vite';
-import { type GetPlatformProxyOptions, getPlatformProxy } from 'wrangler';
+import { cloudflare as cfVitePlugin, type PluginConfig } from '@cloudflare/vite-plugin';
+import type { AstroConfig, AstroIntegration, IntegrationResolvedRoute } from 'astro';
+import { astroFrontmatterScanPlugin } from './esbuild-plugin-astro-frontmatter.js';
+import { getParts } from './utils/generate-routes-json.js';
+import { buildAssetsHeadersContent } from './utils/headers.js';
 import {
-	type CloudflareModulePluginExtra,
-	cloudflareModuleLoader,
-} from './utils/cloudflare-module-loader.js';
-import { createGetEnv } from './utils/env.js';
-import { createRoutesFile, getParts } from './utils/generate-routes-json.js';
-import { type ImageService, setImageConfig } from './utils/image-config.js';
+	type ImageServiceConfig,
+	normalizeImageServiceConfig,
+	setImageConfig,
+} from './utils/image-config.js';
+import { createConfigPlugin } from './vite-plugin-config.js';
+import { createNodePrerenderPlugin } from './vite-plugin-dev-server-prerender-middleware.js';
+import {
+	cloudflareConfigCustomizer,
+	DEFAULT_SESSION_KV_BINDING_NAME,
+	DEFAULT_IMAGES_BINDING_NAME,
+} from './wrangler.js';
+import { parseEnv } from 'node:util';
+import { sessionDrivers } from 'astro/config';
+import { createCloudflarePrerenderer } from './prerenderer.js';
+import cfPrismPlugin from './vite-plugin-prism.js';
+
+const CLOUDFLARE_KV_SESSION_DRIVER_ENTRYPOINT = sessionDrivers.cloudflareKVBinding().entrypoint;
+
+function usesCloudflareKVSessionDriver(session: AstroConfig['session']): boolean {
+	const driver = session?.driver;
+
+	if (!driver) {
+		return false;
+	}
+
+	if (typeof driver === 'string') {
+		return driver === 'cloudflareKVBinding' || driver === 'cloudflare-kv-binding';
+	}
+
+	const entrypoint =
+		typeof driver.entrypoint === 'string' ? driver.entrypoint : driver.entrypoint.toString();
+
+	return (
+		entrypoint === CLOUDFLARE_KV_SESSION_DRIVER_ENTRYPOINT ||
+		entrypoint.endsWith('cloudflare-kv-binding')
+	);
+}
 
 export type { Runtime } from './utils/handler.js';
 
-export type Options = {
+function hasContentCollectionsConfig(srcDir: URL) {
+	const contentConfigPaths = [
+		'content.config.mjs',
+		'content.config.js',
+		'content.config.mts',
+		'content.config.ts',
+		'content/config.mjs',
+		'content/config.js',
+		'content/config.mts',
+		'content/config.ts',
+		'live.config.mjs',
+		'live.config.js',
+		'live.config.mts',
+		'live.config.ts',
+	];
+
+	return contentConfigPaths.some((configPath) => existsSync(new URL(`./${configPath}`, srcDir)));
+}
+
+export interface Options
+	extends Pick<
+		PluginConfig,
+		'auxiliaryWorkers' | 'configPath' | 'inspectorPort' | 'persistState' | 'remoteBindings'
+	> {
 	/** Options for handling images. */
-	imageService?: ImageService;
-	/** Configuration for `_routes.json` generation. A _routes.json file controls when your Function is invoked. This file will include three different properties:
-	 *
-	 * - version: Defines the version of the schema. Currently there is only one version of the schema (version 1), however, we may add more in the future and aim to be backwards compatible.
-	 * - include: Defines routes that will be invoked by Functions. Accepts wildcard behavior.
-	 * - exclude: Defines routes that will not be invoked by Functions. Accepts wildcard behavior. `exclude` always take priority over `include`.
-	 *
-	 * Wildcards match any number of path segments (slashes). For example, `/users/*` will match everything after the `/users/` path.
-	 *
-	 */
-	routes?: {
-		/** Extend `_routes.json` */
-		extend: {
-			/** Paths which should be routed to the SSR function */
-			include?: {
-				/** Generally this is in pathname format, but does support wildcards, e.g. `/users`, `/products/*` */
-				pattern: string;
-			}[];
-			/** Paths which should be routed as static assets */
-			exclude?: {
-				/** Generally this is in pathname format, but does support wildcards, e.g. `/static`, `/assets/*`, `/images/avatar.jpg` */
-				pattern: string;
-			}[];
-		};
-	};
-	/**
-	 * Proxy configuration for the platform.
-	 */
-	platformProxy?: GetPlatformProxyOptions & {
-		/** Toggle the proxy. Default `undefined`, which equals to `true`. */
-		enabled?: boolean;
-	};
+	imageService?: ImageServiceConfig;
 
 	/**
-	 * Allow bundling cloudflare worker specific file types as importable modules. Defaults to true.
-	 * When enabled, allows imports of '.wasm', '.bin', and '.txt' file types
+	 * By default, Astro will be configured to use Cloudflare KV to store session data. The KV namespace
+	 * will be automatically provisioned when you deploy.
 	 *
-	 * See https://developers.cloudflare.com/pages/functions/module-support/
-	 * for reference on how these file types are exported
-	 */
-	cloudflareModules?: boolean;
-
-	/**
-	 * By default, Astro will be configured to use Cloudflare KV to store session data. If you want to use sessions,
-	 * you must create a KV namespace and declare it in your wrangler config file. You can do this with the wrangler command:
+	 * By default, the binding is named `SESSION`, but you can override this by providing a different name here.
+	 * If you define the binding manually in your wrangler config, Astro will use your configuration instead.
 	 *
-	 * ```sh
-	 * npx wrangler kv namespace create SESSION
-	 * ```
-	 *
-	 * This will log the id of the created namespace. You can then add it to your `wrangler.json` file like this:
-	 *
-	 * ```json
-	 * {
-	 *   "kv_namespaces": [
-	 *     {
-	 *       "binding": "SESSION",
-	 *       "id": "<your kv namespace id here>"
-	 *     }
-	 *   ]
-	 * }
-	 * ```
-	 * By default, the driver looks for the binding named `SESSION`, but you can override this by providing a different name here.
-	 *
-	 * See https://developers.cloudflare.com/kv/concepts/kv-namespaces/ for more details on using KV namespaces.
-	 *
+	 * See https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning for more details.
 	 */
 	sessionKVBindingName?: string;
 
 	/**
-	 * This configuration option allows you to specify a custom entryPoint for your Cloudflare Worker.
-	 * The entry point is the file that will be executed when your Worker is invoked.
-	 * By default, this is set to `@astrojs/cloudflare/entrypoints/server.js` and `['default']`.
-	 * @docs https://docs.astro.build/en/guides/integrations-guide/cloudflare/#workerEntryPoint
+	 * When `imageService` is set to `cloudflare-binding`, the Cloudflare Images binding will be used
+	 * to transform images. The binding will be automatically configured for you.
+	 *
+	 * By default, the binding is named `IMAGES`, but you can override this by providing a different name here.
+	 * If you define the binding manually in your wrangler config, Astro will use your configuration instead.
+	 *
+	 * See https://developers.cloudflare.com/images/transform-images/bindings/ for more details.
 	 */
-	workerEntryPoint?: {
-		/**
-		 * The path to the entry file. This should be a relative path from the root of your Astro project.
-		 * @example`'src/worker.ts'`
-		 * @docs https://docs.astro.build/en/guides/integrations-guide/cloudflare/#workerentrypointpath
-		 */
-		path: string | URL;
-		/**
-		 * Additional named exports to use for the entry file. Astro always includes the default export (`['default']`). If you need to have other top level named exports use this option.
-		 * @example ['MyDurableObject', 'namedExport']
-		 * @docs https://docs.astro.build/en/guides/integrations-guide/cloudflare/#workerentrypointnamedexports
-		 */
-		namedExports?: string[];
-	};
-};
+	imagesBindingName?: string;
 
-function wrapWithSlashes(path: string): string {
-	return prependForwardSlash(appendForwardSlash(path));
+	/**
+	 * Controls which runtime is used for prerendering static pages at build time.
+	 *
+	 * - `'workerd'` (default): Uses Cloudflare's workerd runtime.
+	 * - `'node'`: Uses Astro's default node prerender environment.
+	 */
+	prerenderEnvironment?: 'workerd' | 'node';
+
+	experimental?: Pick<
+		NonNullable<PluginConfig['experimental']>,
+		'headersAndRedirectsDevModeSupport'
+	>;
 }
 
-function setProcessEnv(config: AstroConfig, env: Record<string, unknown>) {
-	const getEnv = createGetEnv(env);
-
-	if (config.env?.schema) {
-		for (const key of Object.keys(config.env.schema)) {
-			const value = getEnv(key);
-			if (value !== undefined) {
-				process.env[key] = value;
-			}
-		}
-	}
-}
-
-export default function createIntegration(args?: Options): AstroIntegration {
+export default function createIntegration({
+	imageService,
+	sessionKVBindingName = DEFAULT_SESSION_KV_BINDING_NAME,
+	imagesBindingName = DEFAULT_IMAGES_BINDING_NAME,
+	prerenderEnvironment = 'workerd',
+	...cloudflareOptions
+}: Options = {}): AstroIntegration {
 	let _config: AstroConfig;
-	let finalBuildOutput: HookParameters<'astro:config:done'>['buildOutput'];
-
-	const cloudflareModulePlugin: PluginOption & CloudflareModulePluginExtra = cloudflareModuleLoader(
-		args?.cloudflareModules ?? true,
-	);
+	let _buildOutput: 'server' | 'static';
+	let _originalClientDir: URL;
 
 	let _routes: IntegrationResolvedRoute[];
+	let cfPluginConfig: PluginConfig;
 
-	const SESSION_KV_BINDING_NAME = args?.sessionKVBindingName ?? 'SESSION';
+	const { buildService, runtimeService } = normalizeImageServiceConfig(imageService);
+	const needsImagesBinding = runtimeService === 'cloudflare-binding';
 
 	return {
 		name: '@astrojs/cloudflare',
 		hooks: {
-			'astro:config:setup': ({
-				command,
-				config,
-				updateConfig,
-				logger,
-				addWatchFile,
-				addMiddleware,
-			}) => {
+			'astro:config:setup': async ({ command, config, updateConfig, logger, addWatchFile }) => {
+				if (!!process.versions.webcontainer) {
+					throw new Error('`workerd` does not run on Stackblitz.');
+				}
+
 				let session = config.session;
+				const isCompile = buildService === 'compile';
+
+				if (needsImagesBinding) {
+					logger.info(
+						`Enabling image processing with Cloudflare Images for production with the "${imagesBindingName}" Images binding.`,
+					);
+				} else if (isCompile) {
+					logger.info(
+						`Enabling compile-time image optimization. Images will be pre-optimized at build time.`,
+					);
+				}
 
 				if (!session?.driver) {
 					logger.info(
-						`Enabling sessions with Cloudflare KV with the "${SESSION_KV_BINDING_NAME}" KV binding.`,
-					);
-					logger.info(
-						`If you see the error "Invalid binding \`${SESSION_KV_BINDING_NAME}\`" in your build output, you need to add the binding to your wrangler config file.`,
+						`Enabling sessions with Cloudflare KV with the "${sessionKVBindingName}" KV binding.`,
 					);
 
 					session = {
-						...session,
-						driver: 'cloudflare-kv-binding',
-						options: {
-							binding: SESSION_KV_BINDING_NAME,
-							...session?.options,
-						},
+						driver: sessionDrivers.cloudflareKVBinding({
+							binding: sessionKVBindingName,
+						}),
+						cookie: session?.cookie,
+						ttl: session?.ttl,
 					};
 				}
 
+				const needsSessionKVBinding = usesCloudflareKVSessionDriver(session);
+
+				// In dev, `compile` needs the IMAGES binding for real transforms
+				// (the image-transform-endpoint uses it). At build time,
+				// `compile` uses Sharp on the Node side instead.
+				const needsImagesBindingForDev = isCompile && command === 'dev';
+				const usesContentCollections = hasContentCollectionsConfig(config.srcDir);
+				const prebundleContentRuntime = command === 'dev' && usesContentCollections;
+
+				const adapterPluginConfig: Partial<PluginConfig> = {
+					config: cloudflareConfigCustomizer({
+						needsSessionKVBinding,
+						sessionKVBindingName,
+						imagesBindingName:
+							needsImagesBinding || needsImagesBindingForDev ? imagesBindingName : false,
+					}),
+					...(prerenderEnvironment === 'workerd' && {
+						experimental: {
+							prerenderWorker: {
+								config(_, { entryWorkerConfig }) {
+									const { queues, ...restWorkerConfig } = entryWorkerConfig;
+									return {
+										...restWorkerConfig,
+										name: 'prerender',
+										...(queues?.producers?.length && {
+											queues: { producers: queues.producers },
+										}),
+										...(needsImagesBinding &&
+											!restWorkerConfig.images && {
+												images: { binding: imagesBindingName },
+											}),
+									};
+								},
+							},
+						},
+					}),
+				};
+				// Resolve the full `@cloudflare/vite-plugin` config exactly once by merging
+				// the user's `cloudflare({...})` options (e.g. `remoteBindings`,
+				// `inspectorPort`, `persistState`, `configPath`, `auxiliaryWorkers`) with
+				// the adapter's computed bindings/wrangler wiring. Downstream call sites
+				// (the dev/build plugin instance, the prerenderer's preview server, and
+				// the `astro preview` entrypoint) then just spread `cfPluginConfig` and
+				// cannot accidentally drop user options (see #16705 and related CHANGELOG
+				// entries).
+				cfPluginConfig = { ...cloudflareOptions, ...adapterPluginConfig };
+
+				// The preview entrypoint uses Cloudflare's vite plugin and so it needs
+				// access to the resolved config. There's no proper API for this so we
+				// use globalThis.
+				if (command === 'preview') {
+					globalThis.astroCloudflareConfig = cfPluginConfig;
+				}
+
+				// Including prismjs files in `optimizeDeps.includes` when `@astrojs/prism` is not installed
+				// causes a "Failed to resolve dependency: @astrojs/prism > prismjs" log to appear.
+				// However, when using the `<Prism />` component in a Cloudflare Workers environment,
+				// not including prismjs files in `optimizeDeps.includes` causes
+				// a "The file does not exist at ..." log to appear.
+				// To work around this, we check whether `@astrojs/prism` is installed in the current project.
+				// Note: this "Failed to resolve dependency" log will not appear as long as the `@astrojs/prism` package is installed,
+				// even if it is not actually used.
+				const prismFiles = [
+					'@astrojs/prism > prismjs',
+					'@astrojs/prism > prismjs/components.js',
+					'@astrojs/prism > prismjs/dependencies.js',
+				] as const;
+				const isAstroPrismPackageInstalled = await getIsAstroPrismInstalled(config.root);
+
+				// Capture user's top-level optimizeDeps before Vite scopes it to the
+				// client environment only (Vite 6 Environment API design). We forward
+				// these settings into server environments so that user-provided exclude,
+				// include, and esbuildOptions (e.g. loader) entries are respected.
+				const userOptimizeDeps = config.vite?.optimizeDeps;
+
 				updateConfig({
 					build: {
-						client: new URL(`.${wrapWithSlashes(config.base)}`, config.outDir),
-						server: new URL('./_worker.js/', config.outDir),
-						serverEntry: 'index.js',
 						redirects: false,
 					},
 					session,
 					vite: {
 						plugins: [
-							// https://developers.cloudflare.com/pages/functions/module-support/
-							// Allows imports of '.wasm', '.bin', and '.txt' file types
-							cloudflareModulePlugin,
+							...(prerenderEnvironment === 'node' && command === 'dev'
+								? [createNodePrerenderPlugin()]
+								: []),
+							cfVitePlugin({
+								...cfPluginConfig,
+								viteEnvironment: { name: 'ssr' },
+								assetsOnly: () => _buildOutput === 'static',
+							}),
 							{
-								name: 'vite:cf-imports',
+								name: '@astrojs/cloudflare:cf-imports',
 								enforce: 'pre',
-								resolveId(source) {
-									if (source.startsWith('cloudflare:')) {
-										return { id: source, external: true };
-									}
-									return null;
+								resolveId: {
+									filter: {
+										id: /^cloudflare:/,
+									},
+									handler(id) {
+										return { id, external: true };
+									},
 								},
 							},
+							{
+								name: '@astrojs/cloudflare:environment',
+								configEnvironment(environmentName, _options) {
+									const isServerEnvironment = ['astro', 'ssr', 'prerender'].includes(
+										environmentName,
+									);
+									if (isServerEnvironment && !_options.optimizeDeps?.noDiscovery) {
+										return {
+											optimizeDeps: {
+												include: [
+													'@astrojs/cloudflare/image-service-workerd',
+													'astro',
+													'astro/runtime/**',
+													'astro > html-escaper',
+													'astro > mrmime',
+													'astro > zod/v4',
+													'astro > zod/v4/core',
+													'astro > clsx',
+													'astro > cookie',
+													'astro > devalue',
+													'astro > @oslojs/encoding',
+													'astro > es-module-lexer',
+													'astro > unstorage',
+													'astro > neotraverse/modern',
+													'astro > piccolore',
+													'astro > picomatch',
+													'astro/app',
+													'astro/app/fetch/default-handler',
+													'astro/fetch',
+													'astro/hono',
+													'astro/assets',
+													'astro/assets/runtime',
+													'astro/assets/utils/inferRemoteSize.js',
+													'astro/assets/fonts/runtime.js',
+													...(prebundleContentRuntime ? (['astro/content/runtime'] as const) : []),
+													'astro/compiler-runtime',
+													'astro/jsx-runtime',
+													'astro/app/entrypoint/dev',
+													'astro/virtual-modules/middleware.js',
+													...(isAstroPrismPackageInstalled ? prismFiles : []),
+													...(Array.isArray(userOptimizeDeps?.include)
+														? userOptimizeDeps.include
+														: []),
+												],
+												exclude: [
+													'unstorage/drivers/cloudflare-kv-binding',
+													'astro:*',
+													'virtual:astro:*',
+													'virtual:astro-cloudflare:*',
+													'virtual:@astrojs/*',
+													'@astrojs/starlight',
+													...(Array.isArray(userOptimizeDeps?.exclude)
+														? userOptimizeDeps.exclude
+														: []),
+												],
+												esbuildOptions: {
+													// Suppress Vite's `createRequire(import.meta.url)` banner to work around
+													// https://github.com/vitejs/vite/issues/22004 — Vite's SSR transform
+													// incorrectly rewrites identifiers inside `import.meta` when an imported
+													// binding shares the same name (e.g. zod v4 exports `meta`).
+													banner: { js: '' },
+													plugins: [astroFrontmatterScanPlugin()],
+													...(userOptimizeDeps?.esbuildOptions?.loader
+														? { loader: userOptimizeDeps.esbuildOptions.loader }
+														: {}),
+												},
+											},
+										};
+									} else if (environmentName === 'client') {
+										return {
+											optimizeDeps: {
+												include: ['astro/runtime/client/dev-toolbar/entrypoint.js'],
+												// Workaround for https://github.com/vitejs/vite/issues/20867
+												// When dependencies are discovered mid-request (e.g. a linked package
+												// used with client:only), concurrent requests can fail with 504 because
+												// the dep optimizer's metadata object gets replaced during `await info.processing`.
+												ignoreOutdatedRequests: true,
+											},
+										};
+									}
+								},
+							},
+							{
+								enforce: 'post',
+								name: '@astrojs/cloudflare:cf-externals',
+								applyToEnvironment: (environment) =>
+									environment.name === 'ssr' || environment.name === 'prerender',
+								config(conf) {
+									if (conf.ssr) {
+										// Cloudflare does not support externalizing modules in server environments
+										conf.ssr.external = undefined;
+									}
+								},
+							},
+							createConfigPlugin({
+								sessionKVBindingName,
+								compileImageConfig:
+									isCompile && command !== 'dev'
+										? {
+												base: config.base,
+												assetsPrefix:
+													typeof config.build.assetsPrefix === 'string'
+														? config.build.assetsPrefix
+														: undefined,
+												imageServiceEntrypoint: '@astrojs/cloudflare/image-service-workerd',
+												buildAssets: config.build.assets ?? '_astro',
+											}
+										: null,
+							}),
+							cfPrismPlugin(),
 						],
 					},
-					image: setImageConfig(args?.imageService ?? 'compile', config.image, command, logger),
+					image: setImageConfig(imageService, config.image, command, logger),
 				});
-				if (args?.platformProxy?.configPath) {
-					addWatchFile(new URL(args.platformProxy.configPath, config.root));
-				} else {
-					addWatchFile(new URL('./wrangler.toml', config.root));
-					addWatchFile(new URL('./wrangler.json', config.root));
-					addWatchFile(new URL('./wrangler.jsonc', config.root));
+
+				if (cloudflareOptions.configPath) {
+					addWatchFile(new URL(cloudflareOptions.configPath, config.root));
 				}
-				addMiddleware({
-					entrypoint: '@astrojs/cloudflare/entrypoints/middleware.js',
-					order: 'pre',
-				});
+
+				addWatchFile(new URL('./wrangler.toml', config.root));
+				addWatchFile(new URL('./wrangler.json', config.root));
+				addWatchFile(new URL('./wrangler.jsonc', config.root));
 			},
 			'astro:routes:resolved': ({ routes }) => {
 				_routes = routes;
 			},
-			'astro:config:done': ({ setAdapter, config, buildOutput }) => {
+			'astro:config:done': ({ setAdapter, config, injectTypes, logger, buildOutput }) => {
 				_config = config;
-				finalBuildOutput = buildOutput;
+				_buildOutput = buildOutput;
+				_originalClientDir = new URL(config.build.client.href);
 
-				let customWorkerEntryPoint: URL | undefined;
-				if (args?.workerEntryPoint && typeof args.workerEntryPoint.path === 'string') {
-					const require = createRequire(config.root);
-					try {
-						customWorkerEntryPoint = pathToFileURL(require.resolve(args.workerEntryPoint.path));
-					} catch {
-						customWorkerEntryPoint = new URL(args.workerEntryPoint.path, config.root);
-					}
+				// When a base path is configured, nest the client output directory under
+				// the base so that on-disk paths match the URLs Astro writes into HTML.
+				// Cloudflare Workers' static-asset binding resolves request URLs literally
+				// against the client directory, so the files must live under the base prefix.
+				if (config.base !== '/') {
+					config.build.client = new URL('.' + config.base + '/', config.build.client);
 				}
+
+				injectTypes({
+					filename: 'cloudflare.d.ts',
+					content: '/// <reference types="@astrojs/cloudflare/types.d.ts" />',
+				});
 
 				setAdapter({
 					name: '@astrojs/cloudflare',
-					serverEntrypoint: customWorkerEntryPoint ?? '@astrojs/cloudflare/entrypoints/server.js',
-					exports: [...new Set(['default', ...(args?.workerEntryPoint?.namedExports ?? [])])],
 					adapterFeatures: {
-						edgeMiddleware: false,
-						buildOutput: 'server',
+						buildOutput,
+						middlewareMode: 'classic',
+						preserveBuildClientDir: true,
+						preserveBuildServerDir: true,
 					},
+					entrypointResolution: 'auto',
+					previewEntrypoint: '@astrojs/cloudflare/entrypoints/preview',
 					supportedAstroFeatures: {
 						serverOutput: 'stable',
 						hybridOutput: 'stable',
-						staticOutput: 'unsupported',
+						staticOutput: 'stable',
 						i18nDomains: 'experimental',
 						sharpImageService: {
 							support: 'limited',
 							message:
-								'Cloudflare does not support sharp at runtime. However, you can configure `imageService: "compile"` to optimize images with sharp on prerendered pages during build time.',
-							// For explicitly set image services, we suppress the warning about sharp not being supported at runtime,
-							// inferring the user is aware of the limitations.
-							suppress: args?.imageService ? 'all' : 'default',
+								'When using a custom image service, ensure it is compatible with the Cloudflare Workers runtime.',
+							// Only 'custom' could potentially use sharp at runtime.
+							suppress: buildService === 'custom' ? 'default' : 'all',
 						},
 						envGetSecret: 'stable',
 					},
 				});
+
+				// QUESTION could be removed based on https://developers.cloudflare.com/workers/configuration/compatibility-flags/#enable-auto-populating-processenv
+				// Assign .dev.vars to process.env so astro:env can find these vars
+				const devVarsPath = new URL('.dev.vars', config.root);
+				if (existsSync(devVarsPath)) {
+					try {
+						const data = readFileSync(devVarsPath, 'utf-8');
+						const parsed = parseEnv(data);
+						Object.assign(process.env, parsed);
+					} catch {
+						logger.error(
+							`Unable to parse .dev.vars, variables will not be available to your application.`,
+						);
+					}
+				}
 			},
-			'astro:server:setup': async ({ server }) => {
-				if ((args?.platformProxy?.enabled ?? true) === true) {
-					const platformProxy = await getPlatformProxy(args?.platformProxy);
-
-					// Ensures the dev server doesn't hang
-					server.httpServer?.on('close', async () => {
-						await platformProxy.dispose();
-					});
-
-					setProcessEnv(_config, platformProxy.env);
-
-					globalThis.__env__ ??= {};
-					globalThis.__env__[SESSION_KV_BINDING_NAME] = platformProxy.env[SESSION_KV_BINDING_NAME];
-
-					const clientLocalsSymbol = Symbol.for('astro.locals');
-
-					server.middlewares.use(async function middleware(req, _res, next) {
-						Reflect.set(req, clientLocalsSymbol, {
-							runtime: {
-								env: platformProxy.env,
-								cf: platformProxy.cf,
-								caches: platformProxy.caches,
-								ctx: {
-									waitUntil: (promise: Promise<any>) => platformProxy.ctx.waitUntil(promise),
-									// Currently not available: https://developers.cloudflare.com/pages/platform/known-issues/#pages-functions
-									passThroughOnException: () => {
-										throw new AstroError(
-											'`passThroughOnException` is currently not available in Cloudflare Pages. See https://developers.cloudflare.com/pages/platform/known-issues/#pages-functions.',
-										);
-									},
-								},
-							},
-						});
-						next();
-					});
+			'astro:build:start': ({ setPrerenderer }) => {
+				if (prerenderEnvironment === 'workerd') {
+					setPrerenderer(
+						createCloudflarePrerenderer({
+							root: _config.root,
+							serverDir: _config.build.server,
+							clientDir: _config.build.client,
+							base: _config.base,
+							trailingSlash: _config.trailingSlash,
+							cfPluginConfig,
+							hasCompileImageService: buildService === 'compile',
+						}),
+					);
 				}
 			},
 			'astro:build:setup': ({ vite, target }) => {
 				if (target === 'server') {
 					vite.resolve ||= {};
 					vite.resolve.alias ||= {};
-
-					const aliases = [
-						{
-							find: 'react-dom/server',
-							replacement: 'react-dom/server.browser',
-						},
-					];
-
-					if (Array.isArray(vite.resolve.alias)) {
-						vite.resolve.alias = [...vite.resolve.alias, ...aliases];
-					} else {
-						for (const alias of aliases) {
-							(vite.resolve.alias as Record<string, string>)[alias.find] = alias.replacement;
-						}
-					}
-
-					// Support `workerd` and `worker` conditions for the ssr environment
-					// (previously supported in esbuild instead: https://github.com/withastro/astro/pull/7092)
 					vite.ssr ||= {};
-					vite.ssr.resolve ||= {};
-					vite.ssr.resolve.conditions ||= [...defaultClientConditions];
-					vite.ssr.resolve.conditions.push('workerd', 'worker');
-
-					vite.ssr.target = 'webworker';
 					vite.ssr.noExternal = true;
 
 					vite.build ||= {};
 					vite.build.rollupOptions ||= {};
 					vite.build.rollupOptions.output ||= {};
+					vite.build.rollupOptions.external = ['sharp'];
+
 					// @ts-expect-error
 					vite.build.rollupOptions.output.banner ||=
 						'globalThis.process ??= {}; globalThis.process.env ??= {};';
@@ -341,18 +492,91 @@ export default function createIntegration(args?: Options): AstroIntegration {
 					// in a global way, so we shim their access as `process.env.*`. This is not the recommended way for users to access environment variables. But we'll add this for compatibility for chosen variables. Mainly to support `@astrojs/db`
 					vite.define = {
 						'process.env': 'process.env',
-						// Allows the request handler to know what the binding name is
-						'globalThis.__ASTRO_SESSION_BINDING_NAME': JSON.stringify(SESSION_KV_BINDING_NAME),
+						'globalThis.__ASTRO_IMAGES_BINDING_NAME': JSON.stringify(imagesBindingName),
 						...vite.define,
 					};
 				}
 			},
-			'astro:build:done': async ({ pages, dir, logger, assets }) => {
-				await cloudflareModulePlugin.afterBuildCompleted(_config);
+			'astro:build:done': async ({ dir, logger, assets }) => {
+				// Move platform files from the base-prefixed client dir to the
+				// original client root, since Cloudflare reads them from there.
+				if (_config.base !== '/') {
+					for (const file of ['.assetsignore', '_headers']) {
+						try {
+							await rename(
+								new URL(`./${file}`, _config.build.client),
+								new URL(`./${file}`, _originalClientDir),
+							);
+						} catch {
+							// File may not exist — that's fine
+						}
+					}
+					// The @cloudflare/vite-plugin computes assets.directory from the
+					// modified client outDir which includes the base prefix. However,
+					// Cloudflare's asset binding resolves the full request URL path
+					// (including the base) against the directory, so it must point to
+					// the original un-prefixed client root.
+					// Note: this patches the generated build-output wrangler.json (in
+					// dist/server/), not the project's source wrangler.json.
+					try {
+						const wranglerJsonUrl = new URL('./wrangler.json', _config.build.server);
+						const raw = await readFile(wranglerJsonUrl, 'utf-8');
+						const wranglerConfig = JSON.parse(raw);
+						if (wranglerConfig.assets?.directory) {
+							wranglerConfig.assets.directory = normalizePath(
+								relative(fileURLToPath(_config.build.server), fileURLToPath(_originalClientDir)),
+							);
+							await writeFile(wranglerJsonUrl, JSON.stringify(wranglerConfig));
+						}
+					} catch {
+						// wrangler.json may not exist or may contain invalid JSON
+					}
+				}
+
+				// Inject an immutable Cache-Control rule for hashed assets so browsers
+				// cache them across deploys. Skip when assets are served from another
+				// origin (build.assetsPrefix) or when the user's _headers already sets
+				// Cache-Control on a rule that would match the assets path — Cloudflare
+				// merges duplicate header values with a comma, which would otherwise
+				// produce a contradictory directive.
+				if (_config.build.assetsPrefix) {
+					logger.debug(
+						'Skipping Cache-Control injection for assets — `build.assetsPrefix` is set, so assets are served from a different origin.',
+					);
+				} else {
+					const headersPath = new URL('./_headers', _originalClientDir);
+					const result = await buildAssetsHeadersContent(
+						{
+							assetsDir: _config.build.assets,
+							basePrefix: removeTrailingForwardSlash(_config.base),
+							headersPath,
+						},
+						(path) => readFile(path, 'utf-8'),
+					);
+					if (result === null) {
+						logger.debug(
+							`Skipping Cache-Control injection — _headers already sets Cache-Control on a matching rule.`,
+						);
+					} else {
+						// Atomic write: stage to a temp file, then rename, so a crash
+						// mid-write can't leave the user's _headers truncated.
+						const tempPath = new URL('./_headers.tmp', _originalClientDir);
+						try {
+							await writeFile(tempPath, result.content);
+							await rename(tempPath, headersPath);
+						} catch (err) {
+							await unlink(tempPath).catch(() => {});
+							throw err;
+						}
+						logger.info(
+							`Injected immutable Cache-Control for ${result.assetsPattern} into _headers.`,
+						);
+					}
+				}
 
 				let redirectsExists = false;
 				try {
-					const redirectsStat = await stat(new URL('./_redirects', _config.outDir));
+					const redirectsStat = await stat(new URL('./_redirects', _originalClientDir));
 					if (redirectsStat.isFile()) {
 						redirectsExists = true;
 					}
@@ -363,7 +587,7 @@ export default function createIntegration(args?: Options): AstroIntegration {
 				const redirects: IntegrationResolvedRoute['segments'][] = [];
 				if (redirectsExists) {
 					const rl = createInterface({
-						input: createReadStream(new URL('./_redirects', _config.outDir)),
+						input: createReadStream(new URL('./_redirects', _originalClientDir)),
 						crlfDelay: Number.POSITIVE_INFINITY,
 					});
 
@@ -385,28 +609,6 @@ export default function createIntegration(args?: Options): AstroIntegration {
 					}
 				}
 
-				let routesExists = false;
-				try {
-					const routesStat = await stat(new URL('./_routes.json', _config.outDir));
-					if (routesStat.isFile()) {
-						routesExists = true;
-					}
-				} catch (_error) {
-					routesExists = false;
-				}
-
-				if (!routesExists) {
-					await createRoutesFile(
-						_config,
-						logger,
-						_routes,
-						pages,
-						redirects,
-						args?.routes?.extend?.include,
-						args?.routes?.extend?.exclude,
-					);
-				}
-
 				const trueRedirects = createRedirectsFromAstroRoutes({
 					config: _config,
 					routeToDynamicTargetMap: new Map(
@@ -417,21 +619,43 @@ export default function createIntegration(args?: Options): AstroIntegration {
 						),
 					),
 					dir,
-					buildOutput: finalBuildOutput,
+					buildOutput: _buildOutput,
 					assets,
 				});
 
 				if (!trueRedirects.empty()) {
 					try {
 						await appendFile(
-							new URL('./_redirects', _config.outDir),
+							new URL('./_redirects', _originalClientDir),
 							printAsRedirects(trueRedirects),
 						);
 					} catch (_error) {
 						logger.error('Failed to write _redirects file');
 					}
 				}
+
+				// For fully static sites with preserveBuildClientDir, we keep the server directory
+				// to maintain consistent structure for deployment
+
+				// Delete this variable so the preview server opens the server build.
+				delete process.env.CLOUDFLARE_VITE_BUILD;
 			},
 		},
 	};
+}
+
+// Reads the package.json at the current root to check whether `@astrojs/prism` is installed.
+// Using `require.resolve()` would not work correctly for projects inside a monorepo
+// (such as Astro's test fixtures), as it would traverse parent node_modules directories
+// to resolve the package. For this reason, we directly read `package.json` using `readFile` instead.
+async function getIsAstroPrismInstalled(rootURL: URL) {
+	try {
+		const pkgURL = new URL('./package.json', rootURL);
+		const input = await readFile(pkgURL, { encoding: 'utf-8' });
+		const pkgJson = JSON.parse(input);
+
+		return Object.hasOwn(pkgJson['dependencies'], '@astrojs/prism');
+	} catch {
+		return false;
+	}
 }

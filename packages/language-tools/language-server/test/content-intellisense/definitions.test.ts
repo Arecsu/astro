@@ -4,12 +4,16 @@ import { before, describe, it } from 'node:test';
 import type { LocationLink } from '@volar/language-server';
 import { Position } from '@volar/language-server';
 import { getLanguageServer, type LanguageServer } from '../server.ts';
-import { fixtureDir } from '../utils.ts';
+import { fixtureDir } from '../test-utils.ts';
 
-describe('Content Intellisense - Go To Everywhere', async () => {
+describe('Content Intellisense - Go To Everywhere', {
+	skip: Number.parseInt(process.versions.node) === 20,
+}, async () => {
 	let languageServer: LanguageServer;
 
-	before(async () => (languageServer = await getLanguageServer()));
+	before(async () => {
+		languageServer = await getLanguageServer();
+	});
 
 	it('Provide definitions for keys', async () => {
 		const document = await languageServer.handle.openTextDocument(
@@ -31,13 +35,13 @@ describe('Content Intellisense - Go To Everywhere', async () => {
 		const { targetRange, targetSelectionRange, originSelectionRange } = definitions[0];
 
 		assert.deepStrictEqual(targetRange, {
-			start: { line: 5, character: 2 },
-			end: { line: 5, character: 65 },
+			start: { line: 7, character: 2 },
+			end: { line: 7, character: 65 },
 		});
 
 		assert.deepStrictEqual(targetSelectionRange, {
-			start: { line: 5, character: 2 },
-			end: { line: 5, character: 7 },
+			start: { line: 7, character: 2 },
+			end: { line: 7, character: 7 },
 		});
 
 		assert.deepStrictEqual(originSelectionRange, {

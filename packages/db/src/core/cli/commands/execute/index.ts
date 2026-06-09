@@ -1,8 +1,8 @@
 import { existsSync } from 'node:fs';
 import type { AstroConfig } from 'astro';
-import colors from 'picocolors';
+import colors from 'piccolore';
 import type { Arguments } from 'yargs-parser';
-import { isDbError } from '../../../../runtime/utils.js';
+import { getDbError } from '../../../../runtime/utils.js';
 import {
 	EXEC_DEFAULT_EXPORT_ERROR,
 	EXEC_ERROR,
@@ -15,7 +15,7 @@ import {
 } from '../../../integration/vite-plugin-db.js';
 import { bundleFile, importBundledFile } from '../../../load-file.js';
 import type { DBConfig } from '../../../types.js';
-import { getRemoteDatabaseInfo } from '../../../utils.js';
+import { getRemoteDatabaseInfo, resolveDbAppToken } from '../../../utils.js';
 
 export async function cmd({
 	astroConfig,
@@ -41,9 +41,10 @@ export async function cmd({
 	let virtualModContents: string;
 	if (flags.remote) {
 		const dbInfo = getRemoteDatabaseInfo();
+		const appToken = resolveDbAppToken(flags, dbInfo.token);
 		virtualModContents = getRemoteVirtualModContents({
 			tables: dbConfig.tables ?? {},
-			appToken: flags.token ?? dbInfo.token,
+			appToken,
 			isBuild: false,
 			output: 'server',
 			localExecution: true,
@@ -66,7 +67,8 @@ export async function cmd({
 		await mod.default();
 		console.info(`${colors.green('✔')} File run successfully.`);
 	} catch (e) {
-		if (isDbError(e)) throw new Error(EXEC_ERROR(e.message));
+		const dbError = getDbError(e);
+		if (dbError) throw new Error(EXEC_ERROR(dbError.message));
 		else throw e;
 	}
 }

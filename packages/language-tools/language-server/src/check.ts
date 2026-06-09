@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import * as kit from '@volar/kit';
 import { Diagnostic, DiagnosticSeverity } from '@volar/language-server';
-import fg from 'fast-glob';
+import { globSync } from 'tinyglobby';
 import { URI } from 'vscode-uri';
 import { addAstroTypes, getAstroLanguagePlugin } from './core/index.js';
 import { getSvelteLanguagePlugin } from './core/svelte.js';
@@ -33,12 +33,18 @@ export interface CheckResult {
 export class AstroCheck {
 	private ts!: typeof import('typescript');
 	public linter!: ReturnType<(typeof kit)['createTypeScriptChecker']>;
+	private readonly workspacePath: string;
+	private readonly typescriptPath: string | undefined;
+	private readonly tsconfigPath: string | undefined;
 
 	constructor(
-		private readonly workspacePath: string,
-		private readonly typescriptPath: string | undefined,
-		private readonly tsconfigPath: string | undefined,
+		workspacePath: string,
+		typescriptPath: string | undefined,
+		tsconfigPath: string | undefined,
 	) {
+		this.workspacePath = workspacePath;
+		this.typescriptPath = typescriptPath;
+		this.tsconfigPath = tsconfigPath;
 		this.initialize();
 	}
 
@@ -141,7 +147,7 @@ export class AstroCheck {
 			getSvelteLanguagePlugin(),
 			getVueLanguagePlugin(),
 		];
-		const services = [...createTypeScriptServices(this.ts), createAstroService(this.ts)];
+		const services = [...createTypeScriptServices(this.ts), createAstroService()];
 
 		if (tsconfigPath) {
 			const includeProjectReference = false; // #920
@@ -166,10 +172,12 @@ export class AstroCheck {
 				languagePlugins,
 				services,
 				() => {
-					return fg.sync('**/*.astro', {
+					return globSync('**/*.astro', {
 						cwd: this.workspacePath,
 						ignore: ['node_modules'],
 						absolute: true,
+						// Required to avoid tinyglobby running eternally
+						expandDirectories: false,
 					});
 				},
 				undefined,

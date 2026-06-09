@@ -1,6 +1,6 @@
 # @astrojs/netlify
 
-This adapter allows Astro to deploy your [`hybrid` or `server` rendered site](https://docs.astro.build/en/core-concepts/rendering-modes/#on-demand-rendered) to [Netlify](https://www.netlify.com/).
+This adapter allows Astro to deploy your [`hybrid` or `server` rendered site](https://docs.astro.build/en/guides/on-demand-rendering/) to [Netlify](https://www.netlify.com/).
 
 ## Documentation
 
@@ -34,5 +34,5 @@ Copyright (c) 2023–present [Astro][astro]
 [coc]: https://github.com/withastro/.github/blob/main/CODE_OF_CONDUCT.md
 [community]: https://github.com/withastro/.github/blob/main/COMMUNITY_GUIDE.md
 [discord]: https://astro.build/chat/
-[issues]: https://github.com/withastro/adapter/issues
-[astro-integration]: https://docs.astro.build/en/guides/integrations-guide/
+[issues]: https://github.com/withastro/astro/issues
+[astro-integration]: https://docs.astro.build/en/guides/integrations/

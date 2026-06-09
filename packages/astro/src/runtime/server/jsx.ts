@@ -9,6 +9,8 @@ import {
 } from './index.js';
 import { isAstroComponentFactory } from './render/astro/factory.js';
 import { renderComponentToString } from './render/component.js';
+import type { RenderInstruction } from './render/instruction.js';
+import { mergeSlotInstructions, SlotString } from './render/slot.js';
 
 const ClientOnlyPlaceholder = 'astro-client-only';
 
@@ -35,10 +37,24 @@ export async function renderJSX(result: SSRResult, vnode: any): Promise<any> {
 			return vnode;
 		case !vnode && vnode !== 0:
 			return '';
-		case Array.isArray(vnode):
-			return markHTMLString(
-				(await Promise.all(vnode.map((v: any) => renderJSX(result, v)))).join(''),
-			);
+		case Array.isArray(vnode): {
+			const renderedItems = await Promise.all(vnode.map((v: any) => renderJSX(result, v)));
+			// Collect instructions from SlotString items to preserve hydration scripts
+			let instructions: RenderInstruction[] | null = null;
+			let content = '';
+			for (const item of renderedItems) {
+				if (item instanceof SlotString) {
+					content += item;
+					instructions = mergeSlotInstructions(instructions, item);
+				} else {
+					content += item;
+				}
+			}
+			if (instructions) {
+				return markHTMLString(new SlotString(content, instructions));
+			}
+			return markHTMLString(content);
+		}
 	}
 
 	return renderJSXVNode(result, vnode);
@@ -77,7 +93,9 @@ Did you forget to import the component or is it possible there is a typo?`);
 			}
 			case !vnode.type && (vnode.type as any) !== 0:
 				return '';
-			case typeof vnode.type === 'string' && vnode.type !== ClientOnlyPlaceholder:
+			case typeof vnode.type === 'string' &&
+				vnode.type !== ClientOnlyPlaceholder &&
+				!(vnode.type as string).includes('-'):
 				return markHTMLString(await renderElement(result, vnode.type as string, vnode.props ?? {}));
 		}
 
@@ -171,7 +189,7 @@ async function renderElement(
 ) {
 	return markHTMLString(
 		`<${tag}${spreadAttributes(props)}${markHTMLString(
-			(children == null || children == '') && voidElementNames.test(tag)
+			(children == null || children === '') && voidElementNames.test(tag)
 				? `/>`
 				: `>${
 						children == null ? '' : await renderJSX(result, prerenderElementChildren(tag, children))

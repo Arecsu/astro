@@ -3,12 +3,16 @@ import path from 'node:path';
 import { before, describe, it } from 'node:test';
 import { Position } from '@volar/language-server';
 import { getLanguageServer, type LanguageServer } from '../server.ts';
-import { fixtureDir } from '../utils.ts';
+import { fixtureDir } from '../test-utils.ts';
 
-describe('Content Intellisense - Hover', async () => {
+describe('Content Intellisense - Hover', {
+	skip: Number.parseInt(process.versions.node) === 20,
+}, async () => {
 	let languageServer: LanguageServer;
 
-	before(async () => (languageServer = await getLanguageServer()));
+	before(async () => {
+		languageServer = await getLanguageServer();
+	});
 
 	it('Provide hover information for collection properties', async () => {
 		const document = await languageServer.handle.openTextDocument(

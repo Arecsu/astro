@@ -4,13 +4,17 @@ import { before, describe, it } from 'node:test';
 import type { FullDocumentDiagnosticReport } from '@volar/language-server';
 import { DiagnosticSeverity, Position } from '@volar/language-server';
 import { getLanguageServer, type LanguageServer } from '../server.ts';
-import { fixtureDir } from '../utils.ts';
+import { fixtureDir } from '../test-utils.ts';
 
 // TODO: We can't sync the fixture with these mistakes at all, as such we can't run these tests.
-describe.skip('Content Intellisense - Diagnostics', async () => {
+describe.skip('Content Intellisense - Diagnostics', {
+	skip: Number.parseInt(process.versions.node) === 20,
+}, async () => {
 	let languageServer: LanguageServer;
 
-	before(async () => (languageServer = await getLanguageServer()));
+	before(async () => {
+		languageServer = await getLanguageServer();
+	});
 
 	it('Report errors for missing entries in frontmatter', async () => {
 		const document = await languageServer.handle.openTextDocument(

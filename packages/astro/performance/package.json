@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "",
   "private": true,
-  "main": "index.js",
   "scripts": {
     "benchmark": "node ./content-benchmark.mjs"
   },
@@ -11,6 +10,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "picocolors": "^1.1.1"
+    "piccolore": "^0.1.3"
   }
 }

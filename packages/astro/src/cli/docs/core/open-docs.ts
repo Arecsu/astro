@@ -1,4 +1,4 @@
-import type { Logger } from '../../../core/logger/core.js';
+import type { AstroLogger } from '../../../core/logger/core.js';
 import type { CommandExecutor, OperatingSystemProvider } from '../../definitions.js';
 import { defineCommand } from '../../domain/command.js';
 import type { CloudIdeProvider } from '../definitions.js';
@@ -6,7 +6,7 @@ import type { CloudIdeProvider } from '../definitions.js';
 interface Options {
 	url: string;
 	operatingSystemProvider: OperatingSystemProvider;
-	logger: Logger;
+	logger: AstroLogger;
 	commandExecutor: CommandExecutor;
 	cloudIdeProvider: CloudIdeProvider;
 }
@@ -36,7 +36,7 @@ export const openDocsCommand = defineCommand({
 		description: `Launches the Astro Docs website directly from the terminal.`,
 	},
 	async run({ url, operatingSystemProvider, logger, commandExecutor, cloudIdeProvider }: Options) {
-		const platform = cloudIdeProvider.getName() ?? operatingSystemProvider.getName();
+		const platform = cloudIdeProvider.name ?? operatingSystemProvider.name;
 		const input = getExecInputForPlatform(platform);
 		if (!input) {
 			logger.error(

@@ -1,7 +1,7 @@
 import { mergeConfig as mergeViteConfig } from 'vite';
 import type { DeepPartial } from '../../type-utils.js';
 import type { AstroConfig, AstroInlineConfig } from '../../types/public/index.js';
-import { arraify, isObject, isURL } from '../util.js';
+import { arraify, isObject, isURL } from '../util-runtime.js';
 
 function mergeConfigRecursively(
 	defaults: Record<string, any>,
@@ -40,8 +40,13 @@ function mergeConfigRecursively(
 			}
 		}
 
-		// for server.allowedHosts, if the value is a boolean
-		if (key === 'allowedHosts' && rootPath === 'server' && typeof existing === 'boolean') {
+		// for server.allowedHosts, if either value is a boolean, don't merge as arrays
+		if (
+			key === 'allowedHosts' &&
+			rootPath === 'server' &&
+			(typeof existing === 'boolean' || typeof value === 'boolean')
+		) {
+			merged[key] = typeof value === 'boolean' ? value : existing;
 			continue;
 		}
 
@@ -50,6 +55,18 @@ function mergeConfigRecursively(
 			continue;
 		}
 		if (isURL(existing) && isURL(value)) {
+			merged[key] = value;
+			continue;
+		}
+		// `markdown.processor` is replaced atomically. Deep-merging would mix the inactive
+		// default's options into the user's chosen processor (e.g. user passes a third-party
+		// processor, the default unified() `createRenderer` would leak in).
+		if (
+			key === 'processor' &&
+			rootPath === 'markdown' &&
+			isObject(value) &&
+			typeof value.createRenderer === 'function'
+		) {
 			merged[key] = value;
 			continue;
 		}

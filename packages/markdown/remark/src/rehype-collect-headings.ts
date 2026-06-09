@@ -4,7 +4,9 @@ import type { MdxTextExpression } from 'mdast-util-mdx-expression';
 import type { Node } from 'unist';
 import { visit } from 'unist-util-visit';
 import type { VFile } from 'vfile';
-import type { MarkdownHeading, RehypePlugin } from './types.js';
+import type { MarkdownHeading, RehypePlugin } from '@astrojs/internal-helpers/markdown';
+
+import { FORBIDDEN_PATH_KEYS } from '@astrojs/internal-helpers/object';
 
 const rawNodeTypes = new Set(['text', 'raw', 'mdxTextExpression']);
 const codeTagNames = new Set(['code', 'pre']);
@@ -12,15 +14,9 @@ const codeTagNames = new Set(['code', 'pre']);
 /**
  * Rehype plugin that adds `id` attributes to headings based on their text content.
  *
- * @param options Optional configuration object for the plugin.
- *
  * @see https://docs.astro.build/en/guides/markdown-content/#heading-ids-and-plugins
  */
-export function rehypeHeadingIds({
-	experimentalHeadingIdCompat,
-}: {
-	experimentalHeadingIdCompat?: boolean;
-} = {}): ReturnType<RehypePlugin> {
+export function rehypeHeadingIds(): ReturnType<RehypePlugin> {
 	return function (tree, file) {
 		const headings: MarkdownHeading[] = [];
 		const frontmatter = file.data.astro?.frontmatter;
@@ -68,13 +64,7 @@ export function rehypeHeadingIds({
 
 			node.properties = node.properties || {};
 			if (typeof node.properties.id !== 'string') {
-				let slug = slugger.slug(text);
-
-				if (!experimentalHeadingIdCompat) {
-					if (slug.endsWith('-')) slug = slug.slice(0, -1);
-				}
-
-				node.properties.id = slug;
+				node.properties.id = slugger.slug(text);
 			}
 
 			headings.push({ depth, slug: node.properties.id, text });
@@ -129,7 +119,14 @@ function getMdxFrontmatterVariableValue(frontmatter: Record<string, any>, path: 
 	let value = frontmatter;
 
 	for (const key of path) {
-		if (!value[key]) return undefined;
+		if (
+			FORBIDDEN_PATH_KEYS.has(key) ||
+			!value ||
+			typeof value !== 'object' ||
+			!Object.hasOwn(value, key)
+		) {
+			return undefined;
+		}
 
 		value = value[key];
 	}

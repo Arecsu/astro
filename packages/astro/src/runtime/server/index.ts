@@ -11,6 +11,7 @@ export {
 	markHTMLString,
 	unescapeHTML,
 } from './escape.js';
+
 export { renderJSX } from './jsx.js';
 export type {
 	AstroComponentFactory,
@@ -40,6 +41,7 @@ export {
 	voidElementNames,
 } from './render/index.js';
 export type { ServerIslandComponent } from './render/server-islands.js';
+export { templateEnter, templateExit } from './render/template-depth.js';
 export { createTransitionScope, renderTransition } from './transition.js';
 
 import { markHTMLString } from './escape.js';

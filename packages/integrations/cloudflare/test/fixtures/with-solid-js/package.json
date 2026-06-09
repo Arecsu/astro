@@ -4,8 +4,8 @@
   "private": true,
   "dependencies": {
     "@astrojs/cloudflare": "workspace:*",
-    "@astrojs/solid-js": "^5.1.3",
+    "@astrojs/solid-js": "workspace:*",
     "astro": "workspace:*",
-    "solid-js": "^1.9.10"
+    "solid-js": "^1.9.11"
   }
 }

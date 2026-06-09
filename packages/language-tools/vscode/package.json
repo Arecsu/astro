@@ -24,12 +24,12 @@
     "color": "#17191E",
     "theme": "dark"
   },
-  "version": "2.16.0",
+  "version": "2.16.16",
   "author": "withastro",
   "license": "MIT",
   "publisher": "astro-build",
   "engines": {
-    "vscode": "^1.90.0"
+    "vscode": "^1.101.0"
   },
   "activationEvents": [
     "workspaceContains:astro.config.*"
@@ -37,7 +37,7 @@
   "main": "./dist/node/client.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/withastro/astro.git",
+    "url": "git+https://github.com/withastro/astro.git",
     "directory": "packages/language-tools/vscode"
   },
   "contributes": {
@@ -64,7 +64,7 @@
       },
       {
         "command": "astro.selectTypescriptVersion",
-        "title": "Astro: Select Typescript Version..."
+        "title": "Astro: Select TypeScript Version..."
       },
       {
         "command": "astro.openTsConfig",
@@ -146,13 +146,13 @@
           "scope": "resource",
           "type": "boolean",
           "default": false,
-          "description": "Enable experimental support for content collection intellisense inside Markdown, MDX and Markdoc. Note that this require also enabling the feature in your Astro config (experimental.contentCollectionIntellisense) (Astro 4.14+)"
+          "description": "Enable experimental support for content collection intellisense inside Markdown, MDX and Markdoc. Note that this requires also enabling the feature in your Astro config (experimental.contentIntellisense) (Astro 4.14+)"
         },
         "astro.auto-import-cache.enabled": {
           "scope": "resource",
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Enable the auto import cache. Yields a faster intellisense when automatically importing a file, but can cause issues with new files not being detected. Change is applied on restart. See [#1035](https://github.com/withastro/language-tools/issues/1035)."
+          "markdownDescription": "Enable the auto import cache. Yields a faster intellisense when automatically importing a file, but can cause issues with new files not being detected. Change is applied on restart. See [#14642](https://github.com/withastro/astro/issues/14642)."
         },
         "astro.updateImportsOnFileMove.enabled": {
           "scope": "resource",
@@ -235,8 +235,7 @@
     ]
   },
   "scripts": {
-    "prebuild": "cd ../ts-plugin && pnpm build",
-    "build": "tsc && pnpm prebuild && node scripts/build.mjs -- --minify",
+    "build": "tsc -b && node scripts/build.mjs -- --minify",
     "dev": "node scripts/build.mjs -- --watch",
     "build:grammar": "node scripts/build-grammar.mjs",
     "dev:grammar": "node scripts/build-grammar.mjs -- --watch",
@@ -246,29 +245,30 @@
     "update-grammar-snapshots": "node ./test/grammar/test.mjs --updateSnapshot"
   },
   "devDependencies": {
-    "@astrojs/language-server": "^2.16.0",
-    "@astrojs/ts-plugin": "^1.10.5",
-    "@types/glob": "^8.1.0",
-    "@types/mocha": "^10.0.1",
-    "@types/node": "^20.9.0",
-    "@types/vscode": "^1.82.0",
-    "@volar/language-server": "~2.4.23",
-    "@volar/vscode": "~2.4.23",
-    "@vscode/test-electron": "^2.5.2",
+    "@astrojs/language-server": "^2.16.9",
+    "@astrojs/ts-plugin": "^1.10.9",
+    "@types/js-yaml": "^4.0.9",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.10.6",
+    "@types/vscode": "^1.101.0",
+    "@volar/language-server": "~2.4.28",
+    "@volar/vscode": "~2.4.28",
     "@vscode/test-cli": "^0.0.12",
-    "@vscode/vsce": "2.30.0",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "2.32.0",
     "esbuild": "^0.17.19",
     "esbuild-plugin-copy": "^2.1.1",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.1.1",
     "kleur": "^4.1.5",
-    "mocha": "^10.2.0",
-    "ovsx": "^0.10.6",
+    "mocha": "^11.7.5",
+    "ovsx": "^0.10.10",
+    "tsx": "^4.21.0",
     "vscode-languageclient": "^9.0.1",
-    "vscode-tmgrammar-test": "^0.1.2"
+    "vscode-tmgrammar-test": "^0.1.3"
   },
   "dependencies": {
-    "@astrojs/compiler": "^2.10.3",
-    "prettier": "^3.6.2",
+    "@astrojs/compiler": "^2.13.1",
+    "prettier": "^3.8.2",
     "prettier-plugin-astro": "^0.14.1"
   }
 }

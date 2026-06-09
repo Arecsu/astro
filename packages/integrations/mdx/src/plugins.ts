@@ -5,13 +5,13 @@ import {
 	remarkCollectImages,
 } from '@astrojs/markdown-remark';
 import { createProcessor, nodeTypes } from '@mdx-js/mdx';
-import { rehypeAnalyzeAstroMetadata } from 'astro/jsx/rehype.js';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import remarkSmartypants from 'remark-smartypants';
 import { SourceMapGenerator } from 'source-map';
 import type { PluggableList } from 'unified';
-import type { MdxOptions } from './index.js';
+import type { ResolvedMdxOptions } from './index.js';
+import { rehypeAnalyzeAstroMetadata } from './rehype-analyze-astro-metadata.js';
 import { rehypeApplyFrontmatterExport } from './rehype-apply-frontmatter-export.js';
 import { rehypeInjectHeadingsExport } from './rehype-collect-headings.js';
 import { rehypeImageToComponent } from './rehype-images-to-component.js';
@@ -23,13 +23,15 @@ const isPerformanceBenchmark = Boolean(process.env.ASTRO_PERFORMANCE_BENCHMARK);
 
 interface MdxProcessorExtraOptions {
 	sourcemap: boolean;
-	experimentalHeadingIdCompat: boolean;
 }
 
-export function createMdxProcessor(mdxOptions: MdxOptions, extraOptions: MdxProcessorExtraOptions) {
+export function createMdxProcessor(
+	mdxOptions: ResolvedMdxOptions,
+	extraOptions: MdxProcessorExtraOptions,
+) {
 	return createProcessor({
 		remarkPlugins: getRemarkPlugins(mdxOptions),
-		rehypePlugins: getRehypePlugins(mdxOptions, extraOptions),
+		rehypePlugins: getRehypePlugins(mdxOptions),
 		recmaPlugins: mdxOptions.recmaPlugins,
 		remarkRehypeOptions: mdxOptions.remarkRehype,
 		jsxImportSource: 'astro',
@@ -41,15 +43,17 @@ export function createMdxProcessor(mdxOptions: MdxOptions, extraOptions: MdxProc
 	});
 }
 
-function getRemarkPlugins(mdxOptions: MdxOptions): PluggableList {
+function getRemarkPlugins(mdxOptions: ResolvedMdxOptions): PluggableList {
 	let remarkPlugins: PluggableList = [];
 
 	if (!isPerformanceBenchmark) {
 		if (mdxOptions.gfm) {
 			remarkPlugins.push(remarkGfm);
 		}
-		if (mdxOptions.smartypants) {
-			remarkPlugins.push(remarkSmartypants);
+		if (mdxOptions.smartypants !== false) {
+			const smartypantsConfig =
+				typeof mdxOptions.smartypants === 'object' ? mdxOptions.smartypants : {};
+			remarkPlugins.push([remarkSmartypants, smartypantsConfig]);
 		}
 	}
 
@@ -58,10 +62,7 @@ function getRemarkPlugins(mdxOptions: MdxOptions): PluggableList {
 	return remarkPlugins;
 }
 
-function getRehypePlugins(
-	mdxOptions: MdxOptions,
-	{ experimentalHeadingIdCompat }: MdxProcessorExtraOptions,
-): PluggableList {
+function getRehypePlugins(mdxOptions: ResolvedMdxOptions): PluggableList {
 	let rehypePlugins: PluggableList = [
 		// ensure `data.meta` is preserved in `properties.metastring` for rehype syntax highlighters
 		rehypeMetaString,
@@ -88,10 +89,7 @@ function getRehypePlugins(
 	if (!isPerformanceBenchmark) {
 		// getHeadings() is guaranteed by TS, so this must be included.
 		// We run `rehypeHeadingIds` _last_ to respect any custom IDs set by user plugins.
-		rehypePlugins.push(
-			[rehypeHeadingIds, { experimentalHeadingIdCompat }],
-			rehypeInjectHeadingsExport,
-		);
+		rehypePlugins.push([rehypeHeadingIds], rehypeInjectHeadingsExport);
 	}
 
 	rehypePlugins.push(

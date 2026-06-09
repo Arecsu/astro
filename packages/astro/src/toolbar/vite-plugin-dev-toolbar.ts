@@ -1,10 +1,12 @@
+import { readFileSync, writeFileSync } from 'node:fs';
 import type * as vite from 'vite';
 import { telemetry } from '../events/index.js';
 import { eventAppToggled } from '../events/toolbar.js';
 import type { AstroPluginOptions } from '../types/astro.js';
 
-const PRIVATE_VIRTUAL_MODULE_ID = 'astro:toolbar:internal';
-const resolvedPrivateVirtualModuleId = '\0' + PRIVATE_VIRTUAL_MODULE_ID;
+// This is used by Cloudflare optimizeDeps config
+const VIRTUAL_MODULE_ID = 'astro:toolbar:internal';
+const RESOLVED_VIRTUAL_MODULE_ID = '\0' + VIRTUAL_MODULE_ID;
 
 export default function astroDevToolbar({ settings, logger }: AstroPluginOptions): vite.Plugin {
 	let telemetryTimeout: ReturnType<typeof setTimeout>;
@@ -15,14 +17,46 @@ export default function astroDevToolbar({ settings, logger }: AstroPluginOptions
 			return {
 				optimizeDeps: {
 					// Optimize CJS dependencies used by the dev toolbar
-					include: ['astro > aria-query', 'astro > axobject-query'],
+					include: [
+						'astro > aria-query',
+						'astro > axobject-query',
+						...(settings.devToolbarApps.length > 0 ? ['astro/toolbar'] : []),
+					],
+					esbuildOptions: {
+						plugins: [
+							{
+								name: 'astro:strip-toolbar-sourcemap',
+								setup(build) {
+									// The dev toolbar entrypoint is served via /@id/ which causes
+									// the browser to mis-resolve the relative sourceMappingURL that
+									// esbuild adds, producing a bogus 404 request. Strip it after
+									// esbuild writes the optimized deps to disk.
+									build.onEnd((result) => {
+										if (!result.metafile) return;
+										for (const outputPath of Object.keys(result.metafile.outputs)) {
+											if (!outputPath.includes('entrypoint') || !outputPath.endsWith('.js'))
+												continue;
+											const code = readFileSync(outputPath, 'utf-8');
+											const stripped = code.replace(/\/\/# sourceMappingURL=.*$/m, '');
+											if (stripped !== code) {
+												writeFileSync(outputPath, stripped);
+											}
+										}
+									});
+								},
+							},
+						],
+					},
 				},
 			};
 		},
-		resolveId(id) {
-			if (id === PRIVATE_VIRTUAL_MODULE_ID) {
-				return resolvedPrivateVirtualModuleId;
-			}
+		resolveId: {
+			filter: {
+				id: new RegExp(`^${VIRTUAL_MODULE_ID}$`),
+			},
+			handler() {
+				return RESOLVED_VIRTUAL_MODULE_ID;
+			},
 		},
 		configureServer(server) {
 			server.hot.on('astro:devtoolbar:error:load', (args) => {
@@ -56,8 +90,11 @@ export default function astroDevToolbar({ settings, logger }: AstroPluginOptions
 				}, 200);
 			});
 		},
-		async load(id) {
-			if (id === resolvedPrivateVirtualModuleId) {
+		load: {
+			filter: {
+				id: new RegExp(`^${RESOLVED_VIRTUAL_MODULE_ID}$`),
+			},
+			handler() {
 				return {
 					code: `
 						export const loadDevToolbarApps = async () => {
@@ -115,7 +152,7 @@ export default function astroDevToolbar({ settings, logger }: AstroPluginOptions
 						}
 					`,
 				};
-			}
+			},
 		},
 	};
 }

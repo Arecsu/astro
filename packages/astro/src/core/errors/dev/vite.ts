@@ -6,9 +6,9 @@ import type { ErrorPayload } from 'vite';
 import type { SSRLoadedRenderer } from '../../../types/public/internal.js';
 import type { ModuleLoader } from '../../module-loader/index.js';
 import { AstroError, type ErrorWithMetadata } from '../errors.js';
-import { FailedToLoadModuleSSR, InvalidGlob, MdxIntegrationMissingError } from '../errors-data.js';
+import { FailedToLoadModuleSSR, MdxIntegrationMissingError } from '../errors-data.js';
 import { createSafeError } from '../utils.js';
-import { getDocsForError, renderErrorMarkdown } from './utils.js';
+import { getDocsForError, renderErrorMarkdown } from './runtime.js';
 
 export function enhanceViteSSRError({
 	error,
@@ -75,29 +75,6 @@ export function enhanceViteSSRError({
 				location: safeError.loc,
 				stack: safeError.stack,
 			}) as ErrorWithMetadata;
-		}
-
-		// Since Astro.glob is a wrapper around Vite's import.meta.glob, errors don't show accurate information, let's fix that
-		if (safeError.message.includes('Invalid glob')) {
-			const globPattern = /glob: "(.+)" \(/.exec(safeError.message)?.[1];
-
-			if (globPattern) {
-				safeError.message = InvalidGlob.message(globPattern);
-				safeError.name = 'InvalidGlob';
-				safeError.title = InvalidGlob.title;
-
-				const line = lns.findIndex((ln) => ln.includes(globPattern));
-
-				if (line !== -1) {
-					const column = lns[line]?.indexOf(globPattern);
-
-					safeError.loc = {
-						file: path,
-						line: line + 1,
-						column,
-					};
-				}
-			}
 		}
 	}
 
@@ -189,7 +166,7 @@ export async function getViteErrorPayload(err: ErrorWithMetadata): Promise<Astro
 }
 
 /**
- * Transformer for `shiki`'s legacy `lineOptions`, allows to add classes to specific lines
+ * Transformer for `shiki`'s legacy `lineOptions`, allows adding classes to specific lines
  * FROM: https://github.com/shikijs/shiki/blob/4a58472070a9a359a4deafec23bb576a73e24c6a/packages/transformers/src/transformers/compact-line-options.ts
  * LICENSE: https://github.com/shikijs/shiki/blob/4a58472070a9a359a4deafec23bb576a73e24c6a/LICENSE
  */

@@ -1,11 +1,11 @@
 import type { ComponentInstance } from '../../types/astro.js';
 import type { Params, Props } from '../../types/public/common.js';
+import type { AstroConfig } from '../../types/public/index.js';
 import type { RouteData } from '../../types/public/internal.js';
 import { DEFAULT_404_COMPONENT } from '../constants.js';
 import { AstroError, AstroErrorData } from '../errors/index.js';
-import type { Logger } from '../logger/core.js';
-import { routeIsFallback } from '../redirects/helpers.js';
-import { routeIsRedirect } from '../redirects/index.js';
+import type { AstroLogger } from '../logger/core.js';
+import { routeHasHtmlExtension, routeIsFallback, routeIsRedirect } from '../routing/helpers.js';
 import type { RouteCache } from './route-cache.js';
 import { callGetStaticPaths, findPathItemByKey } from './route-cache.js';
 
@@ -14,13 +14,23 @@ interface GetParamsAndPropsOptions {
 	routeData?: RouteData | undefined;
 	routeCache: RouteCache;
 	pathname: string;
-	logger: Logger;
+	logger: AstroLogger;
 	serverLike: boolean;
 	base: string;
+	trailingSlash: AstroConfig['trailingSlash'];
 }
 
 export async function getProps(opts: GetParamsAndPropsOptions): Promise<Props> {
-	const { logger, mod, routeData: route, routeCache, pathname, serverLike, base } = opts;
+	const {
+		logger,
+		mod,
+		routeData: route,
+		routeCache,
+		pathname,
+		serverLike,
+		base,
+		trailingSlash,
+	} = opts;
 
 	// If there's no route, or if there's a pathname (e.g. a static `src/pages/normal.astro` file),
 	// then we know for sure they don't have params and props, return a fallback value.
@@ -42,17 +52,17 @@ export async function getProps(opts: GetParamsAndPropsOptions): Promise<Props> {
 		mod,
 		route,
 		routeCache,
-		logger,
 		ssr: serverLike,
 		base,
+		trailingSlash,
 	});
 
 	// The pathname used here comes from the server, which already encoded.
 	// Since we decided to not mess up with encoding anymore, we need to decode them back so the parameters can match
 	// the ones expected from the users
 	const params = getParams(route, pathname);
-	const matchedStaticPath = findPathItemByKey(staticPaths, params, route, logger);
-	if (!matchedStaticPath && (serverLike ? route.prerender : true)) {
+	const matchedStaticPath = findPathItemByKey(staticPaths, params, route, logger, trailingSlash);
+	if (!matchedStaticPath && route.origin !== 'internal' && (serverLike ? route.prerender : true)) {
 		throw new AstroError({
 			...AstroErrorData.NoMatchingStaticPathFound,
 			message: AstroErrorData.NoMatchingStaticPathFound.message(pathname),
@@ -77,11 +87,20 @@ export function getParams(route: RouteData, pathname: string): Params {
 	if (!route.params.length) return {};
 	// The RegExp pattern expects a decoded string, but the pathname is encoded
 	// when the URL contains non-English characters.
-	const paramsMatch =
-		route.pattern.exec(pathname) ||
-		route.fallbackRoutes
-			.map((fallbackRoute) => fallbackRoute.pattern.exec(pathname))
-			.find((x) => x);
+	// Strip `.html` from the pathname of page routes unless `.html` is a static part of the
+	// route definition itself (e.g. `[slug].html.astro`). Dynamic params like `[id]` would
+	// otherwise greedily capture the `.html` suffix that is either implied or injected
+	// for page routes (e.g. `id = '42.html'` instead of `id = '42'`).
+	// Other route types do not enforce HTML generation nor modify the path, so any suffix
+	// was added by user code and their pattern matching should apply on the complete pathname.
+	const path =
+		pathname.endsWith('.html') && route.type === 'page' && !routeHasHtmlExtension(route)
+			? pathname.slice(0, -5)
+			: pathname;
+
+	const allPatterns = [route, ...route.fallbackRoutes].map((r) => r.pattern);
+	const paramsMatch = allPatterns.map((pattern) => pattern.exec(path)).find((x) => x);
+
 	if (!paramsMatch) return {};
 	const params: Params = {};
 	route.params.forEach((key, i) => {
